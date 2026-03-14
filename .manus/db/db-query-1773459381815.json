@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `meal_logs` ADD `tags` text;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2XFwA4VAgQUFax8.root --database Qn2tojmicqfwvhT6PwghQe --execute ALTER TABLE `meal_logs` ADD `tags` text;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 3075
+}

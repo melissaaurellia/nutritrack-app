@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Camera, Upload, Loader2, Search, BookOpen, PenLine } from "lucide-react";
+import { Camera, Upload, Loader2, Search, BookOpen, PenLine, X } from "lucide-react";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -49,6 +49,8 @@ export default function AddMealDialog({
   const [quantity, setQuantity] = useState("");
   const [servingType, setServingType] = useState("servings");
   const [addToLibrary, setAddToLibrary] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   // Photo state
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -89,12 +91,26 @@ export default function AddMealDialog({
     setQuantity("");
     setServingType("servings");
     setAddToLibrary(false);
+    setTags([]);
+    setTagInput("");
     setPhotoPreview(null);
     setPhotoBase64(null);
     setAnalysisResult(null);
     setEditingAnalysis(false);
     setAnalyzing(false);
     setTab("manual");
+  };
+
+  const addTag = () => {
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tags.includes(t)) {
+      setTags([...tags, t]);
+    }
+    setTagInput("");
+  };
+
+  const removeTag = (tag: string) => {
+    setTags(tags.filter((t) => t !== tag));
   };
 
   const handleManualSubmit = () => {
@@ -111,6 +127,7 @@ export default function AddMealDialog({
       servingType: servingType || undefined,
       loggedAt,
       addToLibrary,
+      tags: tags.length > 0 ? tags : undefined,
     });
   };
 
@@ -139,7 +156,6 @@ export default function AddMealDialog({
       setPhotoMime(file.type || "image/jpeg");
     };
     reader.readAsDataURL(file);
-    // Reset the input so the same file can be selected again
     e.target.value = "";
   }, []);
 
@@ -147,12 +163,10 @@ export default function AddMealDialog({
     if (!photoBase64) return;
     setAnalyzing(true);
     try {
-      // Upload photo first
       const { url } = await uploadPhoto.mutateAsync({
         base64: photoBase64,
         mimeType: photoMime,
       });
-      // Analyze the uploaded photo
       const result = await analyzePhoto.mutateAsync({ imageUrl: url });
       setAnalysisResult({ ...result, photoUrl: url });
       setEditingAnalysis(true);
@@ -176,9 +190,46 @@ export default function AddMealDialog({
         photoUrl: analysisResult.photoUrl,
         loggedAt,
         addToLibrary,
+        tags: tags.length > 0 ? tags : undefined,
       });
     }
   };
+
+  /* ─── Tag Input Component ─── */
+  const TagInput = () => (
+    <div>
+      <Label className="text-xs mb-1">Tags</Label>
+      <div className="flex gap-2">
+        <Input
+          placeholder="e.g. vegan, high-protein"
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); addTag(); }
+          }}
+          className="text-sm"
+        />
+        <Button type="button" variant="outline" size="sm" onClick={addTag}>
+          Add
+        </Button>
+      </div>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 text-[10px] font-medium bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 uppercase tracking-wider"
+            >
+              {tag}
+              <button onClick={() => removeTag(tag)} className="hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
@@ -217,20 +268,16 @@ export default function AddMealDialog({
               <div>
                 <Label htmlFor="calories" className="text-xs mb-1">Calories (kcal)</Label>
                 <Input
-                  id="calories"
-                  type="number"
-                  placeholder="0"
-                  value={calories}
+                  id="calories" type="number" inputMode="decimal"
+                  placeholder="0" value={calories}
                   onChange={(e) => setCalories(e.target.value)}
                 />
               </div>
               <div>
                 <Label htmlFor="protein" className="text-xs mb-1">Protein (g)</Label>
                 <Input
-                  id="protein"
-                  type="number"
-                  placeholder="0"
-                  value={protein}
+                  id="protein" type="number" inputMode="decimal"
+                  placeholder="0" value={protein}
                   onChange={(e) => setProtein(e.target.value)}
                 />
               </div>
@@ -239,10 +286,8 @@ export default function AddMealDialog({
               <div>
                 <Label htmlFor="quantity" className="text-xs mb-1">Quantity</Label>
                 <Input
-                  id="quantity"
-                  type="number"
-                  placeholder="1"
-                  value={quantity}
+                  id="quantity" type="number" inputMode="decimal"
+                  placeholder="1" value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                 />
               </div>
@@ -254,30 +299,19 @@ export default function AddMealDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {servingTypes.map((st) => (
-                      <SelectItem key={st} value={st}>
-                        {st}
-                      </SelectItem>
+                      <SelectItem key={st} value={st}>{st}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+            <TagInput />
             <div className="flex items-center justify-between py-2">
               <Label htmlFor="addToLib" className="text-xs">Add to Food Library</Label>
-              <Switch
-                id="addToLib"
-                checked={addToLibrary}
-                onCheckedChange={setAddToLibrary}
-              />
+              <Switch id="addToLib" checked={addToLibrary} onCheckedChange={setAddToLibrary} />
             </div>
-            <Button
-              onClick={handleManualSubmit}
-              className="w-full"
-              disabled={createMeal.isPending}
-            >
-              {createMeal.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
+            <Button onClick={handleManualSubmit} className="w-full" disabled={createMeal.isPending}>
+              {createMeal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Log Meal
             </Button>
           </TabsContent>
@@ -344,57 +378,29 @@ export default function AddMealDialog({
                   <p className="text-xs text-muted-foreground mt-1">JPG, PNG up to 10MB</p>
                 </div>
                 <Button
-                  variant="outline"
-                  className="w-full"
+                  variant="outline" className="w-full"
                   onClick={() => cameraInputRef.current?.click()}
                 >
                   <Camera className="h-4 w-4 mr-2" /> Take a Photo
                 </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
               </div>
             ) : !analysisResult ? (
               <div className="space-y-3">
                 <div className="rounded-xl overflow-hidden border border-border">
-                  <img
-                    src={photoPreview}
-                    alt="Meal preview"
-                    className="w-full h-48 object-cover"
-                  />
+                  <img src={photoPreview} alt="Meal preview" className="w-full h-48 object-cover" />
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setPhotoPreview(null);
-                      setPhotoBase64(null);
-                    }}
+                    variant="outline" className="flex-1"
+                    onClick={() => { setPhotoPreview(null); setPhotoBase64(null); }}
                   >
                     Retake
                   </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={handleAnalyze}
-                    disabled={analyzing}
-                  >
+                  <Button className="flex-1" onClick={handleAnalyze} disabled={analyzing}>
                     {analyzing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Analyzing...
-                      </>
+                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Analyzing...</>
                     ) : (
                       "Analyze Food"
                     )}
@@ -404,11 +410,7 @@ export default function AddMealDialog({
             ) : (
               <div className="space-y-3">
                 <div className="rounded-xl overflow-hidden border border-border">
-                  <img
-                    src={photoPreview}
-                    alt="Meal preview"
-                    className="w-full h-32 object-cover"
-                  />
+                  <img src={photoPreview} alt="Meal preview" className="w-full h-32 object-cover" />
                 </div>
                 <p className="text-xs text-muted-foreground">{analysisResult.description}</p>
                 <div className="space-y-2">
@@ -452,18 +454,13 @@ export default function AddMealDialog({
                     </div>
                   ))}
                 </div>
+                <TagInput />
                 <div className="flex items-center justify-between py-1">
                   <Label className="text-xs">Add to Food Library</Label>
                   <Switch checked={addToLibrary} onCheckedChange={setAddToLibrary} />
                 </div>
-                <Button
-                  onClick={handlePhotoSubmit}
-                  className="w-full"
-                  disabled={createMeal.isPending}
-                >
-                  {createMeal.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
+                <Button onClick={handlePhotoSubmit} className="w-full" disabled={createMeal.isPending}>
+                  {createMeal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Log {analysisResult.items.length} Item{analysisResult.items.length > 1 ? "s" : ""}
                 </Button>
               </div>

@@ -49,6 +49,7 @@ export const mealLogs = mysqlTable("meal_logs", {
   quantity: decimal("quantity", { precision: 10, scale: 2 }),
   servingType: varchar("servingType", { length: 100 }),
   photoUrl: text("photoUrl"),
+  tags: text("tags"), // comma-separated tags
   loggedAt: bigint("loggedAt", { mode: "number" }).notNull(), // UTC timestamp in ms
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

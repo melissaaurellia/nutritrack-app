@@ -74,12 +74,13 @@ export const appRouter = router({
           quantity: z.number().min(0).optional(),
           servingType: z.string().max(100).optional(),
           photoUrl: z.string().optional(),
+          tags: z.array(z.string()).optional(),
           loggedAt: z.number(), // UTC timestamp in ms
           addToLibrary: z.boolean().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { addToLibrary, ...mealData } = input;
+        const { addToLibrary, tags, ...mealData } = input;
         const meal = await createMealLog({
           ...mealData,
           userId: ctx.user.id,
@@ -88,6 +89,7 @@ export const appRouter = router({
           quantity: mealData.quantity != null ? String(mealData.quantity) : null,
           servingType: mealData.servingType ?? null,
           photoUrl: mealData.photoUrl ?? null,
+          tags: tags && tags.length > 0 ? tags.join(",") : null,
         });
 
         // Optionally add to food library
@@ -137,10 +139,11 @@ export const appRouter = router({
           protein: z.number().min(0).optional(),
           quantity: z.number().min(0).optional(),
           servingType: z.string().max(100).optional(),
+          tags: z.array(z.string()).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { id, ...data } = input;
+        const { id, tags, ...data } = input;
         const updateData: Record<string, unknown> = {};
         if (data.mealName !== undefined) updateData.mealName = data.mealName;
         if (data.mealType !== undefined) updateData.mealType = data.mealType;
@@ -148,6 +151,7 @@ export const appRouter = router({
         if (data.protein !== undefined) updateData.protein = String(data.protein);
         if (data.quantity !== undefined) updateData.quantity = String(data.quantity);
         if (data.servingType !== undefined) updateData.servingType = data.servingType;
+        if (tags !== undefined) updateData.tags = tags.length > 0 ? tags.join(",") : null;
         return updateMealLog(id, ctx.user.id, updateData as any);
       }),
 

@@ -20,3 +20,13 @@
 - [x] Frontend: edit/delete meals
 - [x] Vitest tests for backend procedures
 - [x] PWA support (manifest, service worker)
+- [x] Separate calorie & protein cards with visual target indicators (green = on track)
+- [x] 2x2 meal category grid (no calorie display on cards)
+- [x] Horizontal intake log cards with photo/icon on left
+- [x] Cleaner, tighter intake log card design
+- [x] Show both calories and protein with matching donut chart colors
+- [x] Edit meal via pencil icon next to trash
+- [x] Timestamp display on each meal card
+- [x] Tags support for meals (DB + UI)
+- [x] Meal type icon fallback when no photo
+- [x] New meals appear at top of intake log

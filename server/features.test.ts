@@ -217,6 +217,47 @@ describe("meals", () => {
       })
     ).rejects.toThrow();
   });
+
+  it("creates a meal with tags", async () => {
+    const { ctx } = createAuthContext(985);
+    const caller = appRouter.createCaller(ctx);
+
+    const meal = await caller.meals.create({
+      mealName: "Avocado Toast",
+      mealType: "breakfast",
+      calories: 350,
+      protein: 12,
+      loggedAt: Date.now(),
+      tags: ["vegan", "high-fiber"],
+    });
+
+    expect(meal).toBeDefined();
+    expect(meal.tags).toBe("vegan,high-fiber");
+  });
+
+  it("updates a meal with tags", async () => {
+    const { ctx } = createAuthContext(984);
+    const caller = appRouter.createCaller(ctx);
+
+    const meal = await caller.meals.create({
+      mealName: "Salad",
+      mealType: "lunch",
+      calories: 200,
+      protein: 10,
+      loggedAt: Date.now(),
+    });
+
+    const updated = await caller.meals.update({
+      id: meal.id,
+      mealName: "Caesar Salad",
+      calories: 250,
+      tags: ["low-carb"],
+    });
+
+    expect(updated!.mealName).toBe("Caesar Salad");
+    expect(Number(updated!.calories)).toBe(250);
+    expect(updated!.tags).toBe("low-carb");
+  });
 });
 
 describe("library", () => {
@@ -292,7 +333,7 @@ describe("sheets.sync", () => {
   });
 
   it("returns formatted sync data when sheet is configured", async () => {
-    const { ctx } = createAuthContext(989);
+    const { ctx } = createAuthContext(889);
     const caller = appRouter.createCaller(ctx);
 
     // Configure sheet URL

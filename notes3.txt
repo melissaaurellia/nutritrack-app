@@ -1,0 +1,2 @@
+Screenshot 3 observations after UI redesign:
+The dashboard now shows separate calorie and protein cards with donut charts. The calorie card shows "On track!" with green ring and border when below target (1200 kcal). The protein card shows navy donut with "60 g left". The 2x2 meal grid looks clean with emoji + label + orange plus button. The intake log shows a horizontal card with a meal type icon on the left, meal name, BFAST label, orange 100 KCAL, navy 30G PROTEIN, timestamp 03:27, and pencil/trash icons on the right. Everything matches the requested design.

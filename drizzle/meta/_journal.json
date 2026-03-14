@@ -15,6 +15,13 @@
       "when": 1773458010552,
       "tag": "0001_serious_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773459370730,
+      "tag": "0002_panoramic_norman_osborn",
+      "breakpoints": true
     }
   ]
 }
