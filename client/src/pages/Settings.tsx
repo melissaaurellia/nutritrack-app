@@ -18,16 +18,55 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
+  Tag,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Check,
 } from "lucide-react";
 
 export default function Settings() {
   const { user, logout } = useAuth();
   const { data: settings, refetch } = trpc.settings.get.useQuery();
   const { data: saInfo } = trpc.sheets.serviceAccountEmail.useQuery();
+  const { data: userTags = [], refetch: refetchTags } = trpc.tags.list.useQuery();
+  const utils = trpc.useUtils();
+
   const updateSettings = trpc.settings.update.useMutation({
     onSuccess: () => {
       toast.success("Settings saved");
       refetch();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const addTagMutation = trpc.tags.add.useMutation({
+    onSuccess: () => {
+      refetchTags();
+      utils.tags.suggestions.invalidate();
+      setNewTagName("");
+      toast.success("Tag added");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateTagMutation = trpc.tags.update.useMutation({
+    onSuccess: () => {
+      refetchTags();
+      utils.tags.suggestions.invalidate();
+      setEditingTagId(null);
+      setEditingTagName("");
+      toast.success("Tag updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteTagMutation = trpc.tags.delete.useMutation({
+    onSuccess: () => {
+      refetchTags();
+      utils.tags.suggestions.invalidate();
+      toast.success("Tag deleted");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -37,6 +76,11 @@ export default function Settings() {
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetName, setSheetName] = useState("Sheet1");
   const [copied, setCopied] = useState(false);
+
+  // Tag management state
+  const [newTagName, setNewTagName] = useState("");
+  const [editingTagId, setEditingTagId] = useState<number | null>(null);
+  const [editingTagName, setEditingTagName] = useState("");
 
   useEffect(() => {
     if (settings) {
@@ -85,6 +129,21 @@ export default function Settings() {
       toast.success("Email copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleAddTag = () => {
+    const name = newTagName.trim();
+    if (!name) return;
+    addTagMutation.mutate({ name });
+  };
+
+  const handleUpdateTag = () => {
+    if (editingTagId === null || !editingTagName.trim()) return;
+    updateTagMutation.mutate({ id: editingTagId, name: editingTagName.trim() });
+  };
+
+  const handleDeleteTag = (id: number) => {
+    deleteTagMutation.mutate({ id });
   };
 
   const serviceAccountConfigured = !!saInfo?.email;
@@ -154,6 +213,124 @@ export default function Settings() {
             )}
             Save Targets
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Tag Management */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Tag className="h-4 w-4 text-primary" />
+            Manage Tags
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Create and manage tags to categorize your meals. Tags you create here will appear as quick-add options when logging meals.
+          </p>
+
+          {/* Add new tag */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="New tag name..."
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddTag();
+                }
+              }}
+              className="text-sm"
+            />
+            <Button
+              size="sm"
+              onClick={handleAddTag}
+              disabled={addTagMutation.isPending || !newTagName.trim()}
+            >
+              {addTagMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+
+          {/* Tag list */}
+          {userTags.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground text-xs">
+              No tags yet. Add your first tag above.
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {userTags.map((tag) => (
+                <div
+                  key={tag.id}
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group"
+                >
+                  {editingTagId === tag.id ? (
+                    <>
+                      <Input
+                        value={editingTagName}
+                        onChange={(e) => setEditingTagName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleUpdateTag();
+                          }
+                          if (e.key === "Escape") {
+                            setEditingTagId(null);
+                          }
+                        }}
+                        className="text-sm h-7 flex-1"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 text-green-600 hover:text-green-700"
+                        onClick={handleUpdateTag}
+                        disabled={updateTagMutation.isPending}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 text-muted-foreground"
+                        onClick={() => setEditingTagId(null)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex items-center text-[10px] font-medium bg-orange-100 text-orange-700 rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                        {tag.name}
+                      </span>
+                      <div className="flex-1" />
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+                        onClick={() => {
+                          setEditingTagId(tag.id);
+                          setEditingTagName(tag.name);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                        onClick={() => handleDeleteTag(tag.id)}
+                        disabled={deleteTagMutation.isPending}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

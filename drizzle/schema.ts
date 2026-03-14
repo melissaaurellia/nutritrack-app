@@ -75,3 +75,16 @@ export const foodLibrary = mysqlTable("food_library", {
 
 export type FoodLibraryItem = typeof foodLibrary.$inferSelect;
 export type InsertFoodLibraryItem = typeof foodLibrary.$inferInsert;
+
+/**
+ * User tags - managed collection of tags for meal categorization.
+ */
+export const userTags = mysqlTable("user_tags", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserTag = typeof userTags.$inferSelect;
+export type InsertUserTag = typeof userTags.$inferInsert;

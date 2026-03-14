@@ -16,6 +16,11 @@ import {
   updateFoodLibraryItem,
   deleteFoodLibraryItem,
   searchFoodLibrary,
+  getUserTags,
+  addUserTag,
+  updateUserTag,
+  deleteUserTag,
+  getUsedTagsFromMeals,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
@@ -317,6 +322,41 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
           return JSON.parse(content);
         }
         throw new Error("Failed to analyze image");
+      }),
+  }),
+
+  // ─── Tags ───────────────────────────────────────────────────
+  tags: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getUserTags(ctx.user.id);
+    }),
+
+    suggestions: protectedProcedure.query(async ({ ctx }) => {
+      // Combine managed tags + tags used in meals
+      const managedTags = await getUserTags(ctx.user.id);
+      const usedTags = await getUsedTagsFromMeals(ctx.user.id);
+      const allTags = new Set<string>();
+      managedTags.forEach((t) => allTags.add(t.name.toLowerCase()));
+      usedTags.forEach((t) => allTags.add(t));
+      return Array.from(allTags).sort();
+    }),
+
+    add: protectedProcedure
+      .input(z.object({ name: z.string().min(1).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        return addUserTag({ userId: ctx.user.id, name: input.name.trim().toLowerCase() });
+      }),
+
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        return updateUserTag(input.id, ctx.user.id, input.name.trim().toLowerCase());
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        return deleteUserTag(input.id, ctx.user.id);
       }),
   }),
 

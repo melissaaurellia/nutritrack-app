@@ -9,6 +9,8 @@ import {
   InsertMealLog,
   foodLibrary,
   InsertFoodLibraryItem,
+  userTags,
+  InsertUserTag,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -242,4 +244,59 @@ export async function searchFoodLibrary(userId: number, query: string) {
     .from(foodLibrary)
     .where(and(eq(foodLibrary.userId, userId), sql`${foodLibrary.name} LIKE ${`%${query}%`}`))
     .orderBy(desc(foodLibrary.updatedAt));
+}
+
+// ─── User Tags helpers ─────────────────────────────────────────
+
+export async function getUserTags(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(userTags)
+    .where(eq(userTags.userId, userId))
+    .orderBy(asc(userTags.name));
+}
+
+export async function addUserTag(data: InsertUserTag) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(userTags).values(data);
+  const insertId = result[0].insertId;
+  const rows = await db.select().from(userTags).where(eq(userTags.id, insertId)).limit(1);
+  return rows[0];
+}
+
+export async function updateUserTag(id: number, userId: number, name: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(userTags).set({ name }).where(and(eq(userTags.id, id), eq(userTags.userId, userId)));
+  const rows = await db.select().from(userTags).where(eq(userTags.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function deleteUserTag(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(userTags).where(and(eq(userTags.id, id), eq(userTags.userId, userId)));
+  return { success: true };
+}
+
+export async function getUsedTagsFromMeals(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const meals = await db
+    .select({ tags: mealLogs.tags })
+    .from(mealLogs)
+    .where(and(eq(mealLogs.userId, userId), sql`${mealLogs.tags} IS NOT NULL AND ${mealLogs.tags} != ''`));
+  const tagSet = new Set<string>();
+  for (const m of meals) {
+    if (m.tags) {
+      m.tags.split(",").forEach((t) => {
+        const trimmed = t.trim().toLowerCase();
+        if (trimmed) tagSet.add(trimmed);
+      });
+    }
+  }
+  return Array.from(tagSet).sort();
 }

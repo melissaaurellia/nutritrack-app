@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Camera, Upload, Loader2, Search, BookOpen, PenLine, X } from "lucide-react";
+import { Camera, Upload, Loader2, Search, BookOpen, PenLine } from "lucide-react";
+import TagInput from "@/components/TagInput";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -50,7 +51,6 @@ export default function AddMealDialog({
   const [servingType, setServingType] = useState("servings");
   const [addToLibrary, setAddToLibrary] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
 
   // Photo state
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -92,25 +92,12 @@ export default function AddMealDialog({
     setServingType("servings");
     setAddToLibrary(false);
     setTags([]);
-    setTagInput("");
     setPhotoPreview(null);
     setPhotoBase64(null);
     setAnalysisResult(null);
     setPhotoDescription("");
     setAnalyzing(false);
     setTab("manual");
-  };
-
-  const addTag = () => {
-    const t = tagInput.trim().toLowerCase();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
-    }
-    setTagInput("");
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
   };
 
   const handleManualSubmit = () => {
@@ -171,7 +158,6 @@ export default function AddMealDialog({
         imageUrl: url,
         userDescription: photoDescription.trim() || undefined,
       });
-      // result is now a single item: { name, calories, protein, quantity, servingType, description }
       setAnalysisResult({ ...result, photoUrl: url });
     } catch (err: any) {
       toast.error("Failed to analyze photo: " + (err.message || "Unknown error"));
@@ -195,42 +181,6 @@ export default function AddMealDialog({
       tags: tags.length > 0 ? tags : undefined,
     });
   };
-
-  /* ─── Tag Input Component ─── */
-  const TagInput = () => (
-    <div>
-      <Label className="text-xs mb-1">Tags</Label>
-      <div className="flex gap-2">
-        <Input
-          placeholder="e.g. vegan, high-protein"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); addTag(); }
-          }}
-          className="text-sm"
-        />
-        <Button type="button" variant="outline" size="sm" onClick={addTag}>
-          Add
-        </Button>
-      </div>
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 text-[10px] font-medium bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 uppercase tracking-wider"
-            >
-              {tag}
-              <button onClick={() => removeTag(tag)} className="hover:text-foreground">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
@@ -306,7 +256,7 @@ export default function AddMealDialog({
                 </Select>
               </div>
             </div>
-            <TagInput />
+            <TagInput tags={tags} onTagsChange={setTags} />
             <div className="flex items-center justify-between py-2">
               <Label htmlFor="addToLib" className="text-xs">Add to Food Library</Label>
               <Switch id="addToLib" checked={addToLibrary} onCheckedChange={setAddToLibrary} />
@@ -342,21 +292,21 @@ export default function AddMealDialog({
                     onClick={() => handleLibrarySelect(item)}
                     className="w-full text-left p-3 rounded-lg hover:bg-muted transition-colors border border-transparent hover:border-border"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.defaultQuantity && item.defaultServingType
-                            ? `${item.defaultQuantity} ${item.defaultServingType}`
-                            : ""}
-                        </p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                        {item.defaultQuantity && item.defaultServingType && (
+                          <p className="text-xs text-muted-foreground">
+                            {item.defaultQuantity} {item.defaultServingType}
+                          </p>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-foreground">
+                      <div className="text-right shrink-0 space-y-0.5">
+                        <p className="text-sm font-semibold" style={{ color: "oklch(0.65 0.18 55)" }}>
                           {Math.round(Number(item.calories))} Cal
                         </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {Math.round(Number(item.protein))}g protein
+                        <p className="text-sm font-semibold" style={{ color: "oklch(0.35 0.1 260)" }}>
+                          {Math.round(Number(item.protein))}g Pro
                         </p>
                       </div>
                     </div>
@@ -456,7 +406,7 @@ export default function AddMealDialog({
                   </div>
                 </div>
 
-                <TagInput />
+                <TagInput tags={tags} onTagsChange={setTags} />
                 <div className="flex items-center justify-between py-1">
                   <Label className="text-xs">Add to Food Library</Label>
                   <Switch checked={addToLibrary} onCheckedChange={setAddToLibrary} />

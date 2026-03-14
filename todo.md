@@ -42,3 +42,8 @@
 - [x] BUG: Google Sheets sync fails to write — shows "Could not write to sheet directly" fallback
 - [x] Add meal description field before "Analyze Meal" button in photo tab
 - [x] AI should return single combined meal entry, not separate items per ingredient
+- [x] BUG: Tag input loses focus after typing one character
+- [x] Tag autocomplete suggestions based on previously used tags
+- [x] Show previously used tags as clickable pills below tag input
+- [x] Tag management feature in Settings (add/edit/delete tags)
+- [x] Make protein equally prominent as calories in library food selection

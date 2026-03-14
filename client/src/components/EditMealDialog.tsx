@@ -16,8 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import TagInput from "@/components/TagInput";
 
 interface EditMealDialogProps {
   open: boolean;
@@ -35,7 +36,7 @@ interface EditMealDialogProps {
   onSuccess: () => void;
 }
 
-const servingTypes = ["pieces", "grams", "plates", "cups", "bowls", "slices", "tablespoons", "servings"];
+const servingTypes = ["pieces", "grams", "plates", "cups", "bowls", "slices", "tablespoons", "servings", "ml"];
 
 export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: EditMealDialogProps) {
   const [mealName, setMealName] = useState(meal.mealName);
@@ -47,7 +48,6 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
   const [tags, setTags] = useState<string[]>(
     meal.tags ? (meal.tags as string).split(",").filter(Boolean) : []
   );
-  const [tagInput, setTagInput] = useState("");
 
   const updateMeal = trpc.meals.update.useMutation({
     onSuccess: () => {
@@ -56,18 +56,6 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
     },
     onError: (err) => toast.error(err.message),
   });
-
-  const addTag = () => {
-    const t = tagInput.trim().toLowerCase();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
-    }
-    setTagInput("");
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
 
   const handleSubmit = () => {
     if (!mealName.trim()) {
@@ -154,38 +142,7 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
             </div>
           </div>
 
-          {/* Tags */}
-          <div>
-            <Label>Tags</Label>
-            <div className="flex gap-2 mt-1">
-              <Input
-                placeholder="e.g. vegan, high-protein"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); addTag(); }
-                }}
-              />
-              <Button type="button" variant="outline" size="sm" onClick={addTag}>
-                Add
-              </Button>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 text-xs font-medium bg-muted text-muted-foreground rounded-full px-2.5 py-0.5"
-                  >
-                    {tag}
-                    <button onClick={() => removeTag(tag)} className="hover:text-foreground">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <TagInput tags={tags} onTagsChange={setTags} />
 
           <Button className="w-full" onClick={handleSubmit} disabled={updateMeal.isPending}>
             {updateMeal.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
