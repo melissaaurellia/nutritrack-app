@@ -1,6 +1,16 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Plus,
   Trash2,
@@ -33,7 +43,6 @@ import AddMealDialog from "@/components/AddMealDialog";
 import EditMealDialog from "@/components/EditMealDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Card, CardContent } from "@/components/ui/card";
 
 /* ─── Constants ───────────────────────────────────────────── */
 const CAL_COLOR = "oklch(0.72 0.17 55)";
@@ -42,10 +51,10 @@ const GREEN = "oklch(0.55 0.18 145)";
 const RED = "oklch(0.55 0.22 27)";
 
 const mealTypeConfig = {
-  breakfast: { label: "Breakfast", shortLabel: "BFAST", emoji: "\u2600\ufe0f", Icon: Coffee, iconBg: "bg-amber-50 text-amber-500" },
-  lunch: { label: "Lunch", shortLabel: "LUNCH", emoji: "\u{1F957}", Icon: Sun, iconBg: "bg-green-50 text-green-500" },
-  dinner: { label: "Dinner", shortLabel: "DINNER", emoji: "\u{1F35D}", Icon: Moon, iconBg: "bg-indigo-50 text-indigo-500" },
-  snack: { label: "Snack", shortLabel: "SNACK", emoji: "\u{1F34E}", Icon: Apple, iconBg: "bg-red-50 text-red-400" },
+  breakfast: { label: "Breakfast", shortLabel: "BFAST", emoji: "☀️", Icon: Coffee, iconBg: "bg-amber-50 text-amber-600", pastelBg: "bg-gradient-to-br from-amber-50 to-orange-50", borderAccent: "border-l-4 border-l-amber-400" },
+  lunch: { label: "Lunch", shortLabel: "LUNCH", emoji: "🥗", Icon: Sun, iconBg: "bg-green-50 text-green-600", pastelBg: "bg-gradient-to-br from-green-50 to-emerald-50", borderAccent: "border-l-4 border-l-green-400" },
+  dinner: { label: "Dinner", shortLabel: "DINNER", emoji: "🍝", Icon: Moon, iconBg: "bg-indigo-50 text-indigo-600", pastelBg: "bg-gradient-to-br from-indigo-50 to-violet-50", borderAccent: "border-l-4 border-l-indigo-400" },
+  snack: { label: "Snack", shortLabel: "SNACK", emoji: "🍎", Icon: Apple, iconBg: "bg-rose-50 text-rose-500", pastelBg: "bg-gradient-to-br from-rose-50 to-pink-50", borderAccent: "border-l-4 border-l-rose-400" },
 } as const;
 
 type MealType = keyof typeof mealTypeConfig;
@@ -114,7 +123,7 @@ function WeekDaySelector({
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
                     isSelected
-                      ? "bg-foreground text-background"
+                      ? "bg-primary text-primary-foreground"
                       : isToday
                       ? "bg-primary/15 text-primary"
                       : "text-foreground hover:bg-muted"
@@ -210,8 +219,6 @@ function MacroCard({
   const isOver = value > target;
   const donutColor = isOnTrack ? GREEN : color;
 
-  // Calories: on-track = under or at target; off-track = over target
-  // Protein: on-track = at or above target; off-track = under target
   let statusText: string;
   let statusColor: string;
   let StatusIcon: typeof ArrowUp;
@@ -315,7 +322,7 @@ function MealCard({
 
         {/* Tags */}
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
+          <div className="flex flex-wrap gap-1 mt-1">
             {tags.map((tag) => (
               <span
                 key={tag}
@@ -356,6 +363,7 @@ export default function Dashboard() {
   const [addMealType, setAddMealType] = useState<MealType>("breakfast");
   const [editMeal, setEditMeal] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const dayStart = useMemo(() => startOfDay(selectedDate).getTime(), [selectedDate]);
   const dayEnd = useMemo(() => endOfDay(selectedDate).getTime(), [selectedDate]);
@@ -395,6 +403,19 @@ export default function Dashboard() {
     [meals]
   );
 
+  // Listen for add-meal events from the bottom nav + button
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.type) {
+        setAddMealType(detail.type);
+        setAddMealOpen(true);
+      }
+    };
+    window.addEventListener("add-meal", handler);
+    return () => window.removeEventListener("add-meal", handler);
+  }, []);
+
   const handleAddMeal = (type: MealType) => {
     setAddMealType(type);
     setAddMealOpen(true);
@@ -407,6 +428,13 @@ export default function Dashboard() {
     }
     setSyncing(true);
     syncSheets.mutate({ date: format(selectedDate, "yyyy-MM-dd") });
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMeal.mutate({ id: deleteTarget.id });
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -436,21 +464,21 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── 2x2 Meal Category Grid — minimalist ── */}
+      {/* ── 2x2 Meal Category Grid — colorful pastel cards ── */}
       <div className="grid grid-cols-2 gap-2">
         {(Object.entries(mealTypeConfig) as [MealType, (typeof mealTypeConfig)[MealType]][]).map(
           ([type, config]) => (
             <button
               key={type}
-              className="rounded-2xl bg-card px-4 py-3 flex items-center justify-between transition-all hover:shadow-sm active:scale-[0.98]"
+              className={`rounded-2xl px-4 py-3 flex items-center justify-between transition-all hover:shadow-md active:scale-[0.98] ${config.pastelBg}`}
               onClick={() => handleAddMeal(type)}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-xl shrink-0">{config.emoji}</span>
                 <span className="text-sm font-semibold text-foreground truncate">{config.label}</span>
               </div>
-              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 ml-2">
-                <Plus className="h-3.5 w-3.5 text-primary" />
+              <div className="h-7 w-7 rounded-full bg-white/70 flex items-center justify-center shrink-0 ml-2">
+                <Plus className="h-3.5 w-3.5 text-foreground/60" />
               </div>
             </button>
           )
@@ -510,7 +538,7 @@ export default function Dashboard() {
               key={meal.id}
               meal={meal}
               onEdit={() => setEditMeal(meal)}
-              onDelete={() => deleteMeal.mutate({ id: meal.id })}
+              onDelete={() => setDeleteTarget({ id: meal.id, name: meal.mealName })}
             />
           ))}
         </div>
@@ -518,10 +546,31 @@ export default function Dashboard() {
         {meals.length === 0 && (
           <div className="rounded-2xl bg-card py-10 text-center">
             <p className="text-muted-foreground text-sm">No meals logged yet.</p>
-            <p className="text-muted-foreground text-xs mt-1">Tap a meal category above to start.</p>
+            <p className="text-muted-foreground text-xs mt-1">Tap the + button or a meal category to start.</p>
           </div>
         )}
       </div>
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete meal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteTarget?.name}</span>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialogs */}
       <AddMealDialog

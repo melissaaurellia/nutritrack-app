@@ -60,3 +60,7 @@
 - [x] UI: Remove NutriTrack title from top of app
 - [x] BUG: Settings manage tags section doesn't show existing tags (e.g. yolofoods) - need to see, delete, edit tags
 - [x] Feature: Allow users to edit the date on each entry card
+- [x] UI: Add delete confirmation popup before deleting an entry
+- [x] UI: Redesign bottom nav with centered + button that opens meal type popup card
+- [x] UI: Remove username and logout button from top right (logout stays in Settings)
+- [x] UI: Make app more colorful with soft pastel category cards (inspired by reference designs)

@@ -10,6 +10,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,6 +38,7 @@ export default function Library() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -103,6 +114,13 @@ export default function Library() {
     }
   };
 
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate({ id: deleteTarget.id });
+      setDeleteTarget(null);
+    }
+  };
+
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
@@ -139,7 +157,7 @@ export default function Library() {
               className="rounded-2xl bg-card p-3 flex items-center gap-3 group transition-all hover:shadow-sm"
             >
               {/* Icon — curved rectangle matching dashboard */}
-              <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-primary/5 flex items-center justify-center">
+              <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
                 <UtensilsCrossed className="h-6 w-6 text-primary/40" />
               </div>
 
@@ -175,7 +193,7 @@ export default function Library() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteMutation.mutate({ id: item.id })}
+                  onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -184,6 +202,27 @@ export default function Library() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteTarget?.name}</span> from your library? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add/Edit Dialog */}
       <Dialog
