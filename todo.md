@@ -53,3 +53,10 @@
 - [x] BUG: Photo analysis STILL returns multiple items (e.g., steak, sauce, salad as separate entries) - must return exactly ONE combined entry
 - [x] Ensure description textbox is present after photo capture, before "Analyze Meal" button
 - [x] Frontend must only render ONE meal item from photo analysis, not multiple
+- [x] UI: Make cards simpler (no outline), more minimalist look inspired by reference designs
+- [x] UI: Fix calorie/protein numbers being cut off - put donut chart above text
+- [x] UI: Add on-track (green) / off-track (red) indicators for calories and protein with over/under amount
+- [x] UI: Consistent entry card format in intake log and food library with curved rectangle photo
+- [x] UI: Remove NutriTrack title from top of app
+- [x] BUG: Settings manage tags section doesn't show existing tags (e.g. yolofoods) - need to see, delete, edit tags
+- [x] Feature: Allow users to edit the date on each entry card

@@ -16,9 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import TagInput from "@/components/TagInput";
+import { format } from "date-fns";
 
 interface EditMealDialogProps {
   open: boolean;
@@ -32,6 +33,7 @@ interface EditMealDialogProps {
     quantity: string | null;
     servingType: string | null;
     tags: string | null;
+    loggedAt: number | string;
   };
   onSuccess: () => void;
 }
@@ -49,6 +51,13 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
     meal.tags ? (meal.tags as string).split(",").filter(Boolean) : []
   );
 
+  // Date editing - initialize from loggedAt timestamp
+  const loggedAtMs = Number(meal.loggedAt);
+  const initialDate = format(new Date(loggedAtMs), "yyyy-MM-dd");
+  const initialTime = format(new Date(loggedAtMs), "HH:mm");
+  const [logDate, setLogDate] = useState(initialDate);
+  const [logTime, setLogTime] = useState(initialTime);
+
   const updateMeal = trpc.meals.update.useMutation({
     onSuccess: () => {
       toast.success("Meal updated");
@@ -62,6 +71,14 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
       toast.error("Meal name is required");
       return;
     }
+
+    // Build new loggedAt from date + time inputs
+    const newLoggedAt = new Date(`${logDate}T${logTime}:00`).getTime();
+    if (isNaN(newLoggedAt)) {
+      toast.error("Invalid date or time");
+      return;
+    }
+
     updateMeal.mutate({
       id: meal.id,
       mealName: mealName.trim(),
@@ -71,6 +88,7 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
       quantity: quantity ? Number(quantity) : undefined,
       servingType: servingType || undefined,
       tags,
+      loggedAt: newLoggedAt,
     });
   };
 
@@ -100,6 +118,31 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
                 <SelectItem value="snack">Snack</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Date and Time editing */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="edit-date" className="flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                Date
+              </Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={logDate}
+                onChange={(e) => setLogDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-time">Time</Label>
+              <Input
+                id="edit-time"
+                type="time"
+                value={logTime}
+                onChange={(e) => setLogTime(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

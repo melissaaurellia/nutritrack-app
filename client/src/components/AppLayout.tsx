@@ -39,7 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <UtensilsCrossed className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">NutriTrack</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Welcome</h1>
             <p className="text-muted-foreground text-sm">
               Sign in to start tracking your nutrition goals
             </p>
@@ -58,18 +58,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="container flex items-center justify-between h-14">
-          <div className="flex items-center gap-2">
-            <UtensilsCrossed className="h-5 w-5 text-primary" />
-            <span className="font-bold text-lg text-foreground">NutriTrack</span>
-          </div>
+      {/* Minimal top header - no app title */}
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur">
+        <div className="container flex items-center justify-end h-12">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:block">
+            <span className="text-sm text-muted-foreground">
               {user.name || user.email}
             </span>
-            <Button variant="ghost" size="icon" onClick={logout} title="Sign out">
+            <Button variant="ghost" size="icon" onClick={logout} title="Sign out" className="h-8 w-8">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -78,13 +74,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 pb-20 sm:pb-6">
-        <div className="container py-4 sm:py-6">
+        <div className="container py-3 sm:py-5">
           {children}
         </div>
       </main>
 
       {/* Bottom navigation - mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border sm:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur sm:hidden">
         <div className="flex items-center justify-around h-16 px-2">
           {navItems.map((item) => {
             const isActive = location === item.path;
@@ -107,7 +103,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Side navigation - desktop */}
-      <nav className="hidden sm:flex fixed left-0 top-14 bottom-0 w-16 lg:w-52 bg-card border-r border-border flex-col py-4 z-40">
+      <nav className="hidden sm:flex fixed left-0 top-12 bottom-0 w-16 lg:w-48 bg-card/50 flex-col py-4 z-40">
         <div className="flex flex-col gap-1 px-2">
           {navItems.map((item) => {
             const isActive = location === item.path;
@@ -115,7 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <button
                 key={item.path}
                 onClick={() => setLocation(item.path)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                   isActive
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -135,7 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           main { margin-left: 4rem; }
         }
         @media (min-width: 1024px) {
-          main { margin-left: 13rem; }
+          main { margin-left: 12rem; }
         }
       `}</style>
     </div>

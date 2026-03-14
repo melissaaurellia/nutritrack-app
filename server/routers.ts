@@ -146,10 +146,11 @@ export const appRouter = router({
           quantity: z.number().min(0).optional(),
           servingType: z.string().max(100).optional(),
           tags: z.array(z.string()).optional(),
+          loggedAt: z.number().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { id, tags, ...data } = input;
+        const { id, tags, loggedAt, ...data } = input;
         const updateData: Record<string, unknown> = {};
         if (data.mealName !== undefined) updateData.mealName = data.mealName;
         if (data.mealType !== undefined) updateData.mealType = data.mealType;
@@ -158,6 +159,7 @@ export const appRouter = router({
         if (data.quantity !== undefined) updateData.quantity = String(data.quantity);
         if (data.servingType !== undefined) updateData.servingType = data.servingType;
         if (tags !== undefined) updateData.tags = tags.length > 0 ? tags.join(",") : null;
+        if (loggedAt !== undefined) updateData.loggedAt = loggedAt;
         return updateMealLog(id, ctx.user.id, updateData as any);
       }),
 

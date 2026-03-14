@@ -1,6 +1,5 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
@@ -12,11 +11,12 @@ import {
   Sun,
   Moon,
   Apple,
-  TrendingDown,
-  TrendingUp,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CheckCircle2,
+  ArrowUp,
+  ArrowDown,
+  Copy,
 } from "lucide-react";
 import {
   format,
@@ -33,16 +33,19 @@ import AddMealDialog from "@/components/AddMealDialog";
 import EditMealDialog from "@/components/EditMealDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Card, CardContent } from "@/components/ui/card";
 
 /* ─── Constants ───────────────────────────────────────────── */
 const CAL_COLOR = "oklch(0.72 0.17 55)";
-const PROT_COLOR = "oklch(0.30 0.06 260)";
+const PROT_COLOR = "oklch(0.55 0.12 260)";
+const GREEN = "oklch(0.55 0.18 145)";
+const RED = "oklch(0.55 0.22 27)";
 
 const mealTypeConfig = {
-  breakfast: { label: "Breakfast", shortLabel: "BFAST", emoji: "\u2600\ufe0f", Icon: Coffee, iconBg: "bg-amber-100 text-amber-600" },
-  lunch: { label: "Lunch", shortLabel: "LUNCH", emoji: "\u{1F957}", Icon: Sun, iconBg: "bg-green-100 text-green-600" },
-  dinner: { label: "Dinner", shortLabel: "DINNER", emoji: "\u{1F35D}", Icon: Moon, iconBg: "bg-indigo-100 text-indigo-600" },
-  snack: { label: "Snack", shortLabel: "SNACK", emoji: "\u{1F34E}", Icon: Apple, iconBg: "bg-red-100 text-red-600" },
+  breakfast: { label: "Breakfast", shortLabel: "BFAST", emoji: "\u2600\ufe0f", Icon: Coffee, iconBg: "bg-amber-50 text-amber-500" },
+  lunch: { label: "Lunch", shortLabel: "LUNCH", emoji: "\u{1F957}", Icon: Sun, iconBg: "bg-green-50 text-green-500" },
+  dinner: { label: "Dinner", shortLabel: "DINNER", emoji: "\u{1F35D}", Icon: Moon, iconBg: "bg-indigo-50 text-indigo-500" },
+  snack: { label: "Snack", shortLabel: "SNACK", emoji: "\u{1F34E}", Icon: Apple, iconBg: "bg-red-50 text-red-400" },
 } as const;
 
 type MealType = keyof typeof mealTypeConfig;
@@ -61,29 +64,23 @@ function WeekDaySelector({
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
 
-  // Generate 7 days for the current week view
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart]
   );
 
-  // Determine greeting based on time of day
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
 
   return (
     <div className="space-y-3">
-      {/* Greeting row */}
-      <div className="flex items-center justify-between">
-        <div>
-          <GreetingHeader greeting={greeting} />
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {format(selectedDate, "EEEE, d MMMM yyyy")}
-          </p>
-        </div>
+      <div>
+        <GreetingHeader greeting={greeting} />
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {format(selectedDate, "EEEE, d MMMM yyyy")}
+        </p>
       </div>
 
-      {/* Week navigation + day pills */}
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
@@ -120,7 +117,7 @@ function WeekDaySelector({
                       ? "bg-foreground text-background"
                       : isToday
                       ? "bg-primary/15 text-primary"
-                      : "bg-muted/50 text-foreground hover:bg-muted"
+                      : "text-foreground hover:bg-muted"
                   }`}
                 >
                   {format(day, "d")}
@@ -159,7 +156,7 @@ function DonutChart({
   value,
   target,
   color,
-  size = 64,
+  size = 72,
 }: {
   value: number;
   target: number;
@@ -174,81 +171,99 @@ function DonutChart({
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r={radius} fill="none" stroke="currentColor" className="text-muted/30" strokeWidth="7" />
+        <circle cx="40" cy="40" r={radius} fill="none" stroke="currentColor" className="text-muted/20" strokeWidth="6" />
         <circle
           cx="40" cy="40" r={radius} fill="none"
           stroke={color}
-          strokeWidth="7" strokeLinecap="round"
+          strokeWidth="6" strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           className="transition-all duration-700 ease-out"
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-xs font-bold text-foreground">{Math.round(value)}</span>
+        <span className="text-sm font-bold text-foreground">{Math.round(value)}</span>
       </div>
     </div>
   );
 }
 
-/* ─── Macro Card ──────────────────────────────────────────── */
+/* ─── Macro Card — donut above text, on-track/off-track ──── */
 function MacroCard({
   label,
   value,
   target,
   unit,
   color,
-  isGood,
-  goodLabel,
-  badLabel,
+  isOnTrack,
+  type,
 }: {
   label: string;
   value: number;
   target: number;
   unit: string;
   color: string;
-  isGood: boolean;
-  goodLabel: string;
-  badLabel: string;
+  isOnTrack: boolean;
+  type: "calories" | "protein";
 }) {
-  const remaining = target - value;
-  const donutColor = isGood ? "oklch(0.60 0.19 145)" : color;
+  const diff = Math.round(Math.abs(value - target));
+  const isOver = value > target;
+  const donutColor = isOnTrack ? GREEN : color;
+
+  // Calories: on-track = under or at target; off-track = over target
+  // Protein: on-track = at or above target; off-track = under target
+  let statusText: string;
+  let statusColor: string;
+  let StatusIcon: typeof ArrowUp;
+
+  if (type === "calories") {
+    if (value === 0) {
+      statusText = `${target} ${unit} remaining`;
+      statusColor = "text-muted-foreground";
+      StatusIcon = ArrowDown;
+    } else if (isOnTrack) {
+      statusText = `${Math.round(target - value)} ${unit} remaining`;
+      statusColor = "text-green-600";
+      StatusIcon = CheckCircle2;
+    } else {
+      statusText = `${diff} ${unit} over`;
+      statusColor = "text-red-500";
+      StatusIcon = ArrowUp;
+    }
+  } else {
+    if (value === 0) {
+      statusText = `${target}${unit} remaining`;
+      statusColor = "text-muted-foreground";
+      StatusIcon = ArrowDown;
+    } else if (isOnTrack) {
+      statusText = isOver ? `${diff}${unit} over target` : "Goal met!";
+      statusColor = "text-green-600";
+      StatusIcon = CheckCircle2;
+    } else {
+      statusText = `${diff}${unit} short`;
+      statusColor = "text-red-500";
+      StatusIcon = ArrowDown;
+    }
+  }
 
   return (
-    <Card className={`flex-1 min-w-0 transition-all ${isGood ? "border-green-400 bg-green-50/50" : "border-border"}`}>
-      <CardContent className="p-3 flex items-center gap-2.5">
-        <DonutChart value={value} target={target} color={donutColor} size={56} />
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-          <p className="text-sm font-bold text-foreground truncate">
-            {Math.round(value)}<span className="text-[10px] font-normal text-muted-foreground"> / {target} {unit}</span>
-          </p>
-          <div className="flex items-center gap-1 mt-0.5">
-            {isGood ? (
-              <>
-                <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />
-                <span className="text-[10px] font-semibold text-green-600 truncate">{goodLabel}</span>
-              </>
-            ) : (
-              <>
-                {remaining >= 0 ? (
-                  <TrendingDown className="h-3 w-3 text-muted-foreground shrink-0" />
-                ) : (
-                  <TrendingUp className="h-3 w-3 text-red-500 shrink-0" />
-                )}
-                <span className="text-[10px] text-muted-foreground truncate">
-                  {remaining >= 0 ? `${Math.round(remaining)} ${unit} left` : badLabel}
-                </span>
-              </>
-            )}
-          </div>
+    <div className="flex-1 min-w-0 rounded-2xl bg-card p-4 flex flex-col items-center gap-2">
+      <DonutChart value={value} target={target} color={donutColor} size={72} />
+      <div className="text-center w-full">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+        <p className="text-sm font-bold text-foreground mt-0.5">
+          {Math.round(value)} <span className="text-[10px] font-normal text-muted-foreground">/ {target} {unit}</span>
+        </p>
+        <div className={`flex items-center justify-center gap-1 mt-1 ${statusColor}`}>
+          <StatusIcon className="h-3 w-3 shrink-0" />
+          <span className="text-[10px] font-semibold">{statusText}</span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-/* ─── Meal Card (Horizontal with large photo) ─────────────── */
+/* ─── Meal Card — minimalist with curved photo ──────────── */
 function MealCard({
   meal,
   onEdit,
@@ -265,78 +280,72 @@ function MealCard({
   const iconBg = config?.iconBg ?? "bg-muted text-muted-foreground";
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <CardContent className="p-0 flex items-stretch">
-        {/* Left: Photo or Icon — larger area */}
-        <div className="w-24 shrink-0 bg-muted/30 flex items-center justify-center overflow-hidden">
-          {meal.photoUrl ? (
-            <img
-              src={meal.photoUrl}
-              alt={meal.mealName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${iconBg}`}>
-              <IconComp className="h-6 w-6" />
-            </div>
-          )}
+    <div className="rounded-2xl bg-card p-3 flex items-center gap-3 group transition-all hover:shadow-sm">
+      {/* Photo or Icon — curved rectangle */}
+      <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-muted/30 flex items-center justify-center">
+        {meal.photoUrl ? (
+          <img
+            src={meal.photoUrl}
+            alt={meal.mealName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className={`w-full h-full flex items-center justify-center ${iconBg}`}>
+            <IconComp className="h-6 w-6" />
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground truncate">{meal.mealName}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          {config?.shortLabel ?? "MEAL"} &bull; {logTime}
+        </p>
+
+        {/* Macros */}
+        <div className="flex items-center gap-3 mt-1">
+          <span className="text-xs font-bold" style={{ color: CAL_COLOR }}>
+            {Math.round(Number(meal.calories))} kcal
+          </span>
+          <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
+            {Math.round(Number(meal.protein))}g protein
+          </span>
         </div>
 
-        {/* Right: Content */}
-        <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
-          <div className="flex items-start justify-between gap-1">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-foreground truncate">{meal.mealName}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {config?.shortLabel ?? "MEAL"} &bull; {logTime}
-              </p>
-            </div>
-            {/* Actions */}
-            <div className="flex items-center gap-0 shrink-0">
-              <Button
-                variant="ghost" size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={onEdit}
+        {/* Tags */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-block text-[9px] font-medium bg-primary/10 text-primary rounded-full px-2 py-0.5"
               >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost" size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                onClick={onDelete}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+                {tag}
+              </span>
+            ))}
           </div>
+        )}
+      </div>
 
-          {/* Macros row */}
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-xs font-bold" style={{ color: CAL_COLOR }}>
-              {Math.round(Number(meal.calories))} kcal
-            </span>
-            <span className="text-muted-foreground text-[10px]">&bull;</span>
-            <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
-              {Math.round(Number(meal.protein))}g protein
-            </span>
-          </div>
-
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-block text-[9px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5 uppercase tracking-wider"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      {/* Actions */}
+      <div className="flex flex-col items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost" size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={onEdit}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost" size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -378,7 +387,7 @@ export default function Dashboard() {
   const totalCalories = meals.reduce((sum, m) => sum + Number(m.calories), 0);
   const totalProtein = meals.reduce((sum, m) => sum + Number(m.protein), 0);
 
-  const calOnTrack = totalCalories <= calorieTarget && totalCalories > 0;
+  const calOnTrack = totalCalories <= calorieTarget;
   const protOnTrack = totalProtein >= proteinTarget;
 
   const sortedMeals = useMemo(
@@ -401,21 +410,20 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-5 max-w-2xl mx-auto">
       {/* ── Weekly Day Selector ── */}
       <WeekDaySelector selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-      {/* ── Separate Calorie & Protein Cards ── */}
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* ── Calorie & Protein Cards — donut above text ── */}
+      <div className="grid grid-cols-2 gap-3">
         <MacroCard
           label="Calories"
           value={totalCalories}
           target={calorieTarget}
           unit="kcal"
           color={CAL_COLOR}
-          isGood={calOnTrack}
-          goodLabel="On track!"
-          badLabel={`${Math.round(totalCalories - calorieTarget)} over`}
+          isOnTrack={calOnTrack}
+          type="calories"
         />
         <MacroCard
           label="Protein"
@@ -423,31 +431,28 @@ export default function Dashboard() {
           target={proteinTarget}
           unit="g"
           color={PROT_COLOR}
-          isGood={protOnTrack}
-          goodLabel="Goal met!"
-          badLabel={`${Math.round(proteinTarget - totalProtein)}g short`}
+          isOnTrack={protOnTrack}
+          type="protein"
         />
       </div>
 
-      {/* ── 2x2 Meal Category Grid ── */}
+      {/* ── 2x2 Meal Category Grid — minimalist ── */}
       <div className="grid grid-cols-2 gap-2">
         {(Object.entries(mealTypeConfig) as [MealType, (typeof mealTypeConfig)[MealType]][]).map(
           ([type, config]) => (
-            <Card
+            <button
               key={type}
-              className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+              className="rounded-2xl bg-card px-4 py-3 flex items-center justify-between transition-all hover:shadow-sm active:scale-[0.98]"
               onClick={() => handleAddMeal(type)}
             >
-              <CardContent className="px-3 py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xl shrink-0">{config.emoji}</span>
-                  <span className="text-sm font-semibold text-foreground truncate">{config.label}</span>
-                </div>
-                <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center shrink-0 ml-2">
-                  <Plus className="h-3.5 w-3.5 text-primary-foreground" />
-                </div>
-              </CardContent>
-            </Card>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl shrink-0">{config.emoji}</span>
+                <span className="text-sm font-semibold text-foreground truncate">{config.label}</span>
+              </div>
+              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 ml-2">
+                <Plus className="h-3.5 w-3.5 text-primary" />
+              </div>
+            </button>
           )
         )}
       </div>
@@ -457,7 +462,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-foreground">Intake Log</h3>
           {settings?.googleSheetUrl && (
-            <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing || meals.length === 0}>
+            <Button variant="ghost" size="sm" onClick={handleSync} disabled={syncing || meals.length === 0} className="text-muted-foreground">
               {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sheet className="h-3.5 w-3.5 mr-1" />}
               Sync
             </Button>
@@ -466,43 +471,39 @@ export default function Dashboard() {
 
         {/* Sync result (fallback when API write fails) */}
         {syncSheets.data && !syncSheets.data.written && (
-          <Card className="mb-3 border-amber-200 bg-amber-50">
-            <CardContent className="p-3">
-              <p className="text-xs font-semibold text-amber-800 mb-2">Could not write to sheet directly. Copy this data manually:</p>
-              <div className="bg-white rounded p-2 text-xs font-mono space-y-0.5 border overflow-x-auto">
-                <p><span className="text-muted-foreground">Date:</span> {syncSheets.data.date}</p>
-                <p><span className="text-muted-foreground">Day:</span> {syncSheets.data.day}</p>
-                <p><span className="text-muted-foreground">Calories:</span> {syncSheets.data.calories}</p>
-                <p><span className="text-muted-foreground">Protein:</span> {syncSheets.data.protein}</p>
-                <p className="whitespace-pre-wrap break-words"><span className="text-muted-foreground">Meals:</span>{"\n"}{syncSheets.data.meals}</p>
-              </div>
-              <Button
-                size="sm" variant="outline" className="mt-2 text-xs"
-                onClick={() => {
-                  const text = `${syncSheets.data!.date}\t${syncSheets.data!.day}\t\t\t\t${syncSheets.data!.calories}\t${syncSheets.data!.protein}\t\t\t${syncSheets.data!.meals}`;
-                  navigator.clipboard.writeText(text);
-                  toast.success("Copied to clipboard!");
-                }}
-              >
-                Copy as Tab-Separated Row
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="mb-3 rounded-2xl bg-amber-50 p-3">
+            <p className="text-xs font-semibold text-amber-800 mb-2">Could not write to sheet directly. Copy this data manually:</p>
+            <div className="bg-white rounded-lg p-2 text-xs font-mono space-y-0.5 overflow-x-auto">
+              <p><span className="text-muted-foreground">Date:</span> {syncSheets.data.date}</p>
+              <p><span className="text-muted-foreground">Day:</span> {syncSheets.data.day}</p>
+              <p><span className="text-muted-foreground">Calories:</span> {syncSheets.data.calories}</p>
+              <p><span className="text-muted-foreground">Protein:</span> {syncSheets.data.protein}</p>
+              <p className="whitespace-pre-wrap break-words"><span className="text-muted-foreground">Meals:</span>{"\n"}{syncSheets.data.meals}</p>
+            </div>
+            <Button
+              size="sm" variant="ghost" className="mt-2 text-xs"
+              onClick={() => {
+                const text = `${syncSheets.data!.date}\t${syncSheets.data!.day}\t\t\t\t${syncSheets.data!.calories}\t${syncSheets.data!.protein}\t\t\t${syncSheets.data!.meals}`;
+                navigator.clipboard.writeText(text);
+                toast.success("Copied to clipboard!");
+              }}
+            >
+              <Copy className="h-3 w-3 mr-1" /> Copy as Tab-Separated Row
+            </Button>
+          </div>
         )}
 
         {/* Success message when written to sheet */}
         {syncSheets.data?.written && (
-          <Card className="mb-3 border-green-200 bg-green-50">
-            <CardContent className="p-3 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-              <p className="text-xs font-semibold text-green-800">
-                Data synced to Google Sheets! Check your spreadsheet for the updated row.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="mb-3 rounded-2xl bg-green-50 p-3 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+            <p className="text-xs font-semibold text-green-800">
+              Data synced to Google Sheets!
+            </p>
+          </div>
         )}
 
-        {/* Meal cards — horizontal layout with large photo */}
+        {/* Meal cards — minimalist with curved photos */}
         <div className="space-y-2">
           {sortedMeals.map((meal) => (
             <MealCard
@@ -515,12 +516,10 @@ export default function Dashboard() {
         </div>
 
         {meals.length === 0 && (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <p className="text-muted-foreground text-sm">No meals logged yet.</p>
-              <p className="text-muted-foreground text-xs mt-1">Tap a meal category above to start.</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl bg-card py-10 text-center">
+            <p className="text-muted-foreground text-sm">No meals logged yet.</p>
+            <p className="text-muted-foreground text-xs mt-1">Tap a meal category above to start.</p>
+          </div>
         )}
       </div>
 
