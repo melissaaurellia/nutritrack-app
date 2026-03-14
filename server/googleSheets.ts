@@ -7,6 +7,19 @@ import { google } from "googleapis";
  * The user must share their Google Sheet with the service account email address.
  */
 
+function fixPrivateKey(key: string): string {
+  // Some storage systems strip spaces from PEM headers/footers.
+  // e.g. "-----BEGINPRIVATEKEY-----" instead of "-----BEGIN PRIVATE KEY-----"
+  // Normalize all known variants so Node's crypto can parse the key.
+  return key
+    .replace('-----BEGINPRIVATEKEY-----', '-----BEGIN PRIVATE KEY-----')
+    .replace('-----ENDPRIVATEKEY-----', '-----END PRIVATE KEY-----')
+    .replace(/-----BEGIN(\w+)KEY-----/g, '-----BEGIN $1 KEY-----')
+    .replace(/-----END(\w+)KEY-----/g, '-----END $1 KEY-----')
+    .replace('BEGIN PRIVATE  KEY', 'BEGIN PRIVATE KEY')
+    .replace('END PRIVATE  KEY', 'END PRIVATE KEY');
+}
+
 function getAuthClient() {
   const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!keyJson) {
@@ -22,12 +35,29 @@ function getAuthClient() {
     throw new Error("Invalid Google Service Account key format. Must be valid JSON.");
   }
 
+  if (credentials.private_key) {
+    credentials.private_key = fixPrivateKey(credentials.private_key);
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
   return auth;
+}
+
+/**
+ * Quote a sheet name for use in A1 notation.
+ * Sheet names with spaces or special characters must be wrapped in single quotes.
+ */
+function quoteSheetName(name: string): string {
+  // If the name contains spaces or special chars, wrap in single quotes
+  // and escape any existing single quotes by doubling them.
+  if (/[\s'!]/.test(name) || name.includes("'")) {
+    return `'${name.replace(/'/g, "''")}'`;
+  }
+  return name;
 }
 
 /**
@@ -45,8 +75,39 @@ export function getServiceAccountEmail(): string | null {
 }
 
 /**
+ * Auto-detect the first sheet tab name in the spreadsheet.
+ * Falls back to the provided name if detection fails.
+ */
+async function resolveSheetName(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  userSheetName: string
+): Promise<string> {
+  try {
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: "sheets.properties.title",
+    });
+    const titles = meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) as string[];
+    if (!titles || titles.length === 0) return userSheetName;
+
+    // If the user-provided name matches one of the tabs, use it
+    if (titles.includes(userSheetName)) return userSheetName;
+
+    // Otherwise, try a case-insensitive match
+    const lower = userSheetName.toLowerCase();
+    const match = titles.find((t) => t.toLowerCase() === lower);
+    if (match) return match;
+
+    // Fall back to the first sheet tab
+    return titles[0];
+  } catch {
+    return userSheetName;
+  }
+}
+
+/**
  * Append a row of data to a Google Sheet.
- * Finds the next empty row and writes the data.
  */
 export async function appendRowToSheet(
   spreadsheetId: string,
@@ -63,42 +124,40 @@ export async function appendRowToSheet(
     const auth = getAuthClient();
     const sheets = google.sheets({ version: "v4", auth });
 
-    // The columns in the sheet are:
-    // A: Week | B: Date | C: Day | D: Weight (kg) | E: Weight avg | F: Steps
-    // G: Calories (kcal) | H: Protein (g) | I: (hidden) | J: Training Day | K: (hidden) | L: (hidden) | M: Comments | N: Meals
-    //
-    // We auto-fill: B (Date), C (Day), G (Calories), H (Protein), N (Meals)
-    // The rest are left empty for the user/PT to fill manually.
+    // Resolve the actual sheet tab name
+    const resolvedName = await resolveSheetName(sheets, spreadsheetId, sheetName);
+    const quoted = quoteSheetName(resolvedName);
 
+    // Columns: A:Week B:Date C:Day D:Weight E:WeightAvg F:Steps
+    //          G:Calories H:Protein I-L:(hidden) M:Comments N:Meals
+    // We auto-fill: B, C, G, H, N
     const values = [
       [
-        "", // A: Week (manual)
-        rowData.date, // B: Date
-        rowData.day, // C: Day
-        "", // D: Weight (manual)
-        "", // E: Weight avg (manual)
-        "", // F: Steps (manual)
+        "",               // A: Week (manual)
+        rowData.date,     // B: Date
+        rowData.day,      // C: Day
+        "",               // D: Weight (manual)
+        "",               // E: Weight avg (manual)
+        "",               // F: Steps (manual)
         rowData.calories, // G: Calories
-        rowData.protein, // H: Protein
-        "", // I: (hidden/unknown)
-        "", // J: Training Day (manual)
-        "", // K: (hidden)
-        "", // L: (hidden)
-        "", // M: Comments (manual)
-        rowData.meals, // N: Meals
+        rowData.protein,  // H: Protein
+        "",               // I
+        "",               // J: Training Day (manual)
+        "",               // K
+        "",               // L
+        "",               // M: Comments (manual)
+        rowData.meals,    // N: Meals
       ],
     ];
 
-    const range = `${sheetName}!A:N`;
+    const range = `${quoted}!A:N`;
 
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
-      requestBody: {
-        values,
-      },
+      requestBody: { values },
     });
 
     return {
@@ -106,25 +165,7 @@ export async function appendRowToSheet(
       updatedRange: response.data.updates?.updatedRange ?? undefined,
     };
   } catch (err: any) {
-    const message = err.message || "Unknown error writing to Google Sheets";
-
-    // Provide helpful error messages
-    if (message.includes("403") || message.includes("PERMISSION_DENIED")) {
-      return {
-        success: false,
-        error:
-          "Permission denied. Make sure you've shared the Google Sheet with the service account email address (as Editor).",
-      };
-    }
-    if (message.includes("404") || message.includes("not found")) {
-      return {
-        success: false,
-        error:
-          "Spreadsheet not found. Please check the Google Sheets URL in your settings.",
-      };
-    }
-
-    return { success: false, error: message };
+    return { success: false, error: friendlyError(err) };
   }
 }
 
@@ -146,10 +187,14 @@ export async function syncRowToSheet(
     const auth = getAuthClient();
     const sheets = google.sheets({ version: "v4", auth });
 
-    // First, try to find if a row with this date already exists (column B)
+    // Resolve the actual sheet tab name
+    const resolvedName = await resolveSheetName(sheets, spreadsheetId, sheetName);
+    const quoted = quoteSheetName(resolvedName);
+
+    // Check if a row with this date already exists (column B)
     const existingData = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!B:B`,
+      range: `${quoted}!B:B`,
     });
 
     const rows = existingData.data.values || [];
@@ -163,18 +208,18 @@ export async function syncRowToSheet(
     }
 
     if (existingRowIndex > 0) {
-      // Update existing row — only update columns G, H, and N (Calories, Protein, Meals)
+      // Update existing row — only update columns G, H, and N
       const updateRequests = [
         {
-          range: `${sheetName}!G${existingRowIndex}`,
+          range: `${quoted}!G${existingRowIndex}`,
           values: [[rowData.calories]],
         },
         {
-          range: `${sheetName}!H${existingRowIndex}`,
+          range: `${quoted}!H${existingRowIndex}`,
           values: [[rowData.protein]],
         },
         {
-          range: `${sheetName}!N${existingRowIndex}`,
+          range: `${quoted}!N${existingRowIndex}`,
           values: [[rowData.meals]],
         },
       ];
@@ -194,27 +239,30 @@ export async function syncRowToSheet(
       };
     } else {
       // Append new row
-      const result = await appendRowToSheet(spreadsheetId, sheetName, rowData);
+      const result = await appendRowToSheet(spreadsheetId, resolvedName, rowData);
       return { ...result, action: "appended" };
     }
   } catch (err: any) {
-    const message = err.message || "Unknown error";
-
-    if (message.includes("403") || message.includes("PERMISSION_DENIED")) {
-      return {
-        success: false,
-        error:
-          "Permission denied. Make sure you've shared the Google Sheet with the service account email address (as Editor).",
-      };
-    }
-    if (message.includes("404") || message.includes("not found")) {
-      return {
-        success: false,
-        error:
-          "Spreadsheet not found. Please check the Google Sheets URL in your settings.",
-      };
-    }
-
-    return { success: false, error: message };
+    return { success: false, error: friendlyError(err) };
   }
+}
+
+/** Turn API errors into user-friendly messages. */
+function friendlyError(err: any): string {
+  const message = err.message || "Unknown error writing to Google Sheets";
+
+  if (message.includes("403") || message.includes("PERMISSION_DENIED")) {
+    return "Permission denied. Make sure you've shared the Google Sheet with the service account email address (as Editor).";
+  }
+  if (message.includes("404") || message.includes("not found")) {
+    return "Spreadsheet not found. Please check the Google Sheets URL in your settings.";
+  }
+  if (message.includes("Unable to parse range")) {
+    return "Invalid sheet tab name. Please check the Sheet Tab Name in your settings matches an actual tab in your spreadsheet.";
+  }
+  if (message.includes("DECODER") || message.includes("unsupported")) {
+    return "Service account key format error. Please re-upload your Google Service Account JSON key.";
+  }
+
+  return message;
 }

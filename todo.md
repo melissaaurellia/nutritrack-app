@@ -39,3 +39,4 @@
 - [x] Backend: implement Google Sheets write using service account credentials
 - [x] Settings page: add service account email display and setup instructions
 - [x] Request GOOGLE_SERVICE_ACCOUNT_KEY secret from user
+- [x] BUG: Google Sheets sync fails to write — shows "Could not write to sheet directly" fallback

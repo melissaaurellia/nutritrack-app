@@ -1,0 +1,15 @@
+ROOT CAUSE FOUND from network request logs:
+
+The sync API response contains:
+"written": false
+"writeError": "error:1E08010C:DECODER routines::unsupported"
+
+This is an OpenSSL error related to the private key format. The error "DECODER routines::unsupported" 
+means the private key in the Google Service Account JSON is not being parsed correctly.
+
+This is likely because:
+1. The private key has escaped newlines (\n) that need to be converted to actual newlines
+2. Or the key format is incompatible with the current Node.js/OpenSSL version
+
+The fix should be in server/googleSheets.ts where the private key is extracted from the JSON 
+and used to create the JWT for Google API authentication.
