@@ -1,0 +1,16 @@
+{
+  "name": "NutriTrack - Calorie & Protein Tracker",
+  "short_name": "NutriTrack",
+  "description": "Track your daily calorie and protein intake",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF7F0",
+  "theme_color": "#E8772E",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

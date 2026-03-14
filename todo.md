@@ -1,0 +1,22 @@
+# NutriTrack - Calorie & Protein Tracker TODO
+
+- [x] Database schema design (users settings, meals, food library)
+- [x] Backend API: user settings (daily targets)
+- [x] Backend API: meal CRUD (log, list, update, delete)
+- [x] Backend API: food library CRUD
+- [x] Backend API: AI photo analysis for food recognition
+- [x] Backend API: Google Sheets sync
+- [x] Backend API: photo upload to S3
+- [x] Frontend: theme setup (warm orange + navy color scheme)
+- [x] Frontend: layout and navigation (bottom tab / sidebar)
+- [x] Frontend: dashboard with daily summary, progress donuts, meal history
+- [x] Frontend: manual meal logging (name, calories, protein, quantity, serving type)
+- [x] Frontend: meal categorization (Breakfast, Lunch, Dinner, Snack)
+- [x] Frontend: photo-based meal logging with AI analysis
+- [x] Frontend: food library management page
+- [x] Frontend: settings page (daily targets configuration)
+- [x] Frontend: Google Sheets integration settings
+- [x] Frontend: longitudinal trends chart (weekly/monthly)
+- [x] Frontend: edit/delete meals
+- [x] Vitest tests for backend procedures
+- [x] PWA support (manifest, service worker)
