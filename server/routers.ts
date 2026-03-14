@@ -246,27 +246,28 @@ export const appRouter = router({
       .input(
         z.object({
           imageUrl: z.string(),
+          userDescription: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
+        const descriptionHint = input.userDescription
+          ? `\nThe user describes this meal as: "${input.userDescription}". Use this to improve your analysis.`
+          : "";
+
         const result = await invokeLLM({
           messages: [
             {
               role: "system",
-              content: `You are a nutrition analysis expert. Analyze the food in the image and estimate the calories and protein content. Return a JSON object with the following structure:
+              content: `You are a nutrition analysis expert. Analyze the food in the image and estimate the TOTAL calories and protein content for the ENTIRE meal as a single combined entry. Do NOT break the meal into separate ingredients — return one item representing the whole dish/meal.${descriptionHint}
+
+Return a JSON object with the following structure:
 {
-  "items": [
-    {
-      "name": "food item name",
-      "calories": estimated_calories_number,
-      "protein": estimated_protein_grams_number,
-      "quantity": estimated_quantity_number,
-      "servingType": "serving unit (e.g., pieces, grams, plate, cup, bowl)"
-    }
-  ],
-  "totalCalories": total_estimated_calories,
-  "totalProtein": total_estimated_protein_grams,
-  "description": "brief description of what you see in the image"
+  "name": "descriptive name of the whole meal",
+  "calories": total_estimated_calories_number,
+  "protein": total_estimated_protein_grams_number,
+  "quantity": 1,
+  "servingType": "serving",
+  "description": "brief description of what you see in the image and how you estimated the nutrition"
 }
 Be reasonable with estimates. If you cannot identify the food clearly, provide your best estimate and note uncertainty in the description.`,
             },
@@ -275,7 +276,9 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
               content: [
                 {
                   type: "text",
-                  text: "Please analyze this food image and estimate the nutritional content (calories and protein).",
+                  text: input.userDescription
+                    ? `Please analyze this food image. The meal is: ${input.userDescription}`
+                    : "Please analyze this food image and estimate the nutritional content (calories and protein).",
                 },
                 {
                   type: "image_url",
@@ -295,26 +298,14 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
               schema: {
                 type: "object",
                 properties: {
-                  items: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string" },
-                        calories: { type: "number" },
-                        protein: { type: "number" },
-                        quantity: { type: "number" },
-                        servingType: { type: "string" },
-                      },
-                      required: ["name", "calories", "protein", "quantity", "servingType"],
-                      additionalProperties: false,
-                    },
-                  },
-                  totalCalories: { type: "number" },
-                  totalProtein: { type: "number" },
+                  name: { type: "string" },
+                  calories: { type: "number" },
+                  protein: { type: "number" },
+                  quantity: { type: "number" },
+                  servingType: { type: "string" },
                   description: { type: "string" },
                 },
-                required: ["items", "totalCalories", "totalProtein", "description"],
+                required: ["name", "calories", "protein", "quantity", "servingType", "description"],
                 additionalProperties: false,
               },
             },

@@ -58,7 +58,7 @@ export default function AddMealDialog({
   const [photoMime, setPhotoMime] = useState("image/jpeg");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [editingAnalysis, setEditingAnalysis] = useState(false);
+  const [photoDescription, setPhotoDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,7 +96,7 @@ export default function AddMealDialog({
     setPhotoPreview(null);
     setPhotoBase64(null);
     setAnalysisResult(null);
-    setEditingAnalysis(false);
+    setPhotoDescription("");
     setAnalyzing(false);
     setTab("manual");
   };
@@ -167,9 +167,12 @@ export default function AddMealDialog({
         base64: photoBase64,
         mimeType: photoMime,
       });
-      const result = await analyzePhoto.mutateAsync({ imageUrl: url });
+      const result = await analyzePhoto.mutateAsync({
+        imageUrl: url,
+        userDescription: photoDescription.trim() || undefined,
+      });
+      // result is now a single item: { name, calories, protein, quantity, servingType, description }
       setAnalysisResult({ ...result, photoUrl: url });
-      setEditingAnalysis(true);
     } catch (err: any) {
       toast.error("Failed to analyze photo: " + (err.message || "Unknown error"));
     } finally {
@@ -179,20 +182,18 @@ export default function AddMealDialog({
 
   const handlePhotoSubmit = () => {
     if (!analysisResult) return;
-    for (const item of analysisResult.items) {
-      createMeal.mutate({
-        mealName: item.name,
-        mealType,
-        calories: item.calories,
-        protein: item.protein,
-        quantity: item.quantity || undefined,
-        servingType: item.servingType || undefined,
-        photoUrl: analysisResult.photoUrl,
-        loggedAt,
-        addToLibrary,
-        tags: tags.length > 0 ? tags : undefined,
-      });
-    }
+    createMeal.mutate({
+      mealName: analysisResult.name,
+      mealType,
+      calories: analysisResult.calories,
+      protein: analysisResult.protein,
+      quantity: analysisResult.quantity || undefined,
+      servingType: analysisResult.servingType || undefined,
+      photoUrl: analysisResult.photoUrl,
+      loggedAt,
+      addToLibrary,
+      tags: tags.length > 0 ? tags : undefined,
+    });
   };
 
   /* ─── Tag Input Component ─── */
@@ -391,10 +392,21 @@ export default function AddMealDialog({
                 <div className="rounded-xl overflow-hidden border border-border">
                   <img src={photoPreview} alt="Meal preview" className="w-full h-48 object-cover" />
                 </div>
+                <div>
+                  <Label htmlFor="photoDesc" className="text-xs mb-1">
+                    Describe your meal <span className="text-muted-foreground">(optional, helps AI accuracy)</span>
+                  </Label>
+                  <Input
+                    id="photoDesc"
+                    placeholder="e.g. Croissant sandwich with egg, cheese, and ham"
+                    value={photoDescription}
+                    onChange={(e) => setPhotoDescription(e.target.value)}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline" className="flex-1"
-                    onClick={() => { setPhotoPreview(null); setPhotoBase64(null); }}
+                    onClick={() => { setPhotoPreview(null); setPhotoBase64(null); setPhotoDescription(""); }}
                   >
                     Retake
                   </Button>
@@ -402,7 +414,7 @@ export default function AddMealDialog({
                     {analyzing ? (
                       <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Analyzing...</>
                     ) : (
-                      "Analyze Food"
+                      "Analyze Meal"
                     )}
                   </Button>
                 </div>
@@ -413,47 +425,37 @@ export default function AddMealDialog({
                   <img src={photoPreview} alt="Meal preview" className="w-full h-32 object-cover" />
                 </div>
                 <p className="text-xs text-muted-foreground">{analysisResult.description}</p>
-                <div className="space-y-2">
-                  {analysisResult.items.map((item: any, idx: number) => (
-                    <div key={idx} className="bg-muted rounded-lg p-3 space-y-2">
+
+                {/* Single combined meal entry */}
+                <div className="bg-muted rounded-lg p-3 space-y-2">
+                  <div>
+                    <Label className="text-[10px]">Meal Name</Label>
+                    <Input
+                      value={analysisResult.name}
+                      onChange={(e) => setAnalysisResult({ ...analysisResult, name: e.target.value })}
+                      className="text-sm font-medium"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[10px]">Calories (kcal)</Label>
                       <Input
-                        value={item.name}
-                        onChange={(e) => {
-                          const items = [...analysisResult.items];
-                          items[idx] = { ...items[idx], name: e.target.value };
-                          setAnalysisResult({ ...analysisResult, items });
-                        }}
-                        className="text-sm font-medium"
+                        type="number"
+                        value={analysisResult.calories}
+                        onChange={(e) => setAnalysisResult({ ...analysisResult, calories: parseFloat(e.target.value) || 0 })}
                       />
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-[10px]">Calories</Label>
-                          <Input
-                            type="number"
-                            value={item.calories}
-                            onChange={(e) => {
-                              const items = [...analysisResult.items];
-                              items[idx] = { ...items[idx], calories: parseFloat(e.target.value) || 0 };
-                              setAnalysisResult({ ...analysisResult, items });
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px]">Protein (g)</Label>
-                          <Input
-                            type="number"
-                            value={item.protein}
-                            onChange={(e) => {
-                              const items = [...analysisResult.items];
-                              items[idx] = { ...items[idx], protein: parseFloat(e.target.value) || 0 };
-                              setAnalysisResult({ ...analysisResult, items });
-                            }}
-                          />
-                        </div>
-                      </div>
                     </div>
-                  ))}
+                    <div>
+                      <Label className="text-[10px]">Protein (g)</Label>
+                      <Input
+                        type="number"
+                        value={analysisResult.protein}
+                        onChange={(e) => setAnalysisResult({ ...analysisResult, protein: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
                 </div>
+
                 <TagInput />
                 <div className="flex items-center justify-between py-1">
                   <Label className="text-xs">Add to Food Library</Label>
@@ -461,7 +463,7 @@ export default function AddMealDialog({
                 </div>
                 <Button onClick={handlePhotoSubmit} className="w-full" disabled={createMeal.isPending}>
                   {createMeal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Log {analysisResult.items.length} Item{analysisResult.items.length > 1 ? "s" : ""}
+                  Log Meal
                 </Button>
               </div>
             )}

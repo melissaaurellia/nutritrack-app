@@ -40,3 +40,5 @@
 - [x] Settings page: add service account email display and setup instructions
 - [x] Request GOOGLE_SERVICE_ACCOUNT_KEY secret from user
 - [x] BUG: Google Sheets sync fails to write — shows "Could not write to sheet directly" fallback
+- [x] Add meal description field before "Analyze Meal" button in photo tab
+- [x] AI should return single combined meal entry, not separate items per ingredient
