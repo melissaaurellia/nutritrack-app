@@ -3,8 +3,6 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Trash2,
   Pencil,
@@ -17,15 +15,28 @@ import {
   TrendingDown,
   TrendingUp,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { format, startOfDay, endOfDay, addDays, subDays } from "date-fns";
+import {
+  format,
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  addDays,
+  addWeeks,
+  subWeeks,
+  isSameDay,
+  isToday as isDateToday,
+} from "date-fns";
 import AddMealDialog from "@/components/AddMealDialog";
 import EditMealDialog from "@/components/EditMealDialog";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
-// Colors matching the donut charts
-const CAL_COLOR = "oklch(0.72 0.17 55)"; // warm orange
-const PROT_COLOR = "oklch(0.30 0.06 260)"; // navy
+/* ─── Constants ───────────────────────────────────────────── */
+const CAL_COLOR = "oklch(0.72 0.17 55)";
+const PROT_COLOR = "oklch(0.30 0.06 260)";
 
 const mealTypeConfig = {
   breakfast: { label: "Breakfast", shortLabel: "BFAST", emoji: "\u2600\ufe0f", Icon: Coffee, iconBg: "bg-amber-100 text-amber-600" },
@@ -36,7 +47,114 @@ const mealTypeConfig = {
 
 type MealType = keyof typeof mealTypeConfig;
 
-/* ─── Donut Chart ──────────────────────────────────────────── */
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/* ─── Weekly Day Selector ─────────────────────────────────── */
+function WeekDaySelector({
+  selectedDate,
+  onSelectDate,
+}: {
+  selectedDate: Date;
+  onSelectDate: (d: Date) => void;
+}) {
+  const [weekStart, setWeekStart] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+
+  // Generate 7 days for the current week view
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart]
+  );
+
+  // Determine greeting based on time of day
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
+
+  return (
+    <div className="space-y-3">
+      {/* Greeting row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <GreetingHeader greeting={greeting} />
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {format(selectedDate, "EEEE, d MMMM yyyy")}
+          </p>
+        </div>
+      </div>
+
+      {/* Week navigation + day pills */}
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={() => setWeekStart((w) => subWeeks(w, 1))}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        <div className="flex-1 grid grid-cols-7 gap-1">
+          {weekDays.map((day, i) => {
+            const isSelected = isSameDay(day, selectedDate);
+            const isToday = isDateToday(day);
+
+            return (
+              <button
+                key={i}
+                onClick={() => onSelectDate(day)}
+                className="flex flex-col items-center gap-0.5 py-1 rounded-xl transition-all"
+              >
+                <span
+                  className={`text-[10px] font-medium ${
+                    isSelected
+                      ? "text-foreground font-bold"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {DAY_LABELS[i]}
+                </span>
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                    isSelected
+                      ? "bg-foreground text-background"
+                      : isToday
+                      ? "bg-primary/15 text-primary"
+                      : "bg-muted/50 text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {format(day, "d")}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={() => setWeekStart((w) => addWeeks(w, 1))}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Greeting Header ─────────────────────────────────────── */
+function GreetingHeader({ greeting }: { greeting: string }) {
+  const { user } = useAuth();
+  const name = user?.name?.split(" ")[0] ?? "";
+  return (
+    <h2 className="text-lg font-bold text-foreground">
+      {greeting}{name ? `, ${name}` : ""}
+    </h2>
+  );
+}
+
+/* ─── Donut Chart ─────────────────────────────────────────── */
 function DonutChart({
   value,
   target,
@@ -73,7 +191,7 @@ function DonutChart({
   );
 }
 
-/* ─── Macro Card ───────────────────────────────────────────── */
+/* ─── Macro Card ──────────────────────────────────────────── */
 function MacroCard({
   label,
   value,
@@ -130,26 +248,99 @@ function MacroCard({
   );
 }
 
-/* ─── Meal Icon ────────────────────────────────────────────── */
-function MealIcon({ meal }: { meal: any }) {
-  if (meal.photoUrl) {
-    return (
-      <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border">
-        <img src={meal.photoUrl} alt="" className="w-full h-full object-cover" />
-      </div>
-    );
-  }
+/* ─── Meal Card (Horizontal with large photo) ─────────────── */
+function MealCard({
+  meal,
+  onEdit,
+  onDelete,
+}: {
+  meal: any;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const config = mealTypeConfig[meal.mealType as MealType];
+  const tags = meal.tags ? (meal.tags as string).split(",").filter(Boolean) : [];
+  const logTime = format(new Date(Number(meal.loggedAt)), "HH:mm");
   const IconComp = config?.Icon ?? Coffee;
   const iconBg = config?.iconBg ?? "bg-muted text-muted-foreground";
+
   return (
-    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-      <IconComp className="h-4 w-4" />
-    </div>
+    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+      <CardContent className="p-0 flex items-stretch">
+        {/* Left: Photo or Icon — larger area */}
+        <div className="w-24 shrink-0 bg-muted/30 flex items-center justify-center overflow-hidden">
+          {meal.photoUrl ? (
+            <img
+              src={meal.photoUrl}
+              alt={meal.mealName}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${iconBg}`}>
+              <IconComp className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+
+        {/* Right: Content */}
+        <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
+          <div className="flex items-start justify-between gap-1">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-foreground truncate">{meal.mealName}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {config?.shortLabel ?? "MEAL"} &bull; {logTime}
+              </p>
+            </div>
+            {/* Actions */}
+            <div className="flex items-center gap-0 shrink-0">
+              <Button
+                variant="ghost" size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={onEdit}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost" size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Macros row */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-xs font-bold" style={{ color: CAL_COLOR }}>
+              {Math.round(Number(meal.calories))} kcal
+            </span>
+            <span className="text-muted-foreground text-[10px]">&bull;</span>
+            <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
+              {Math.round(Number(meal.protein))}g protein
+            </span>
+          </div>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-block text-[9px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5 uppercase tracking-wider"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-/* ─── Main Dashboard ───────────────────────────────────────── */
+/* ─── Main Dashboard ──────────────────────────────────────── */
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [addMealOpen, setAddMealOpen] = useState(false);
@@ -187,14 +378,9 @@ export default function Dashboard() {
   const totalCalories = meals.reduce((sum, m) => sum + Number(m.calories), 0);
   const totalProtein = meals.reduce((sum, m) => sum + Number(m.protein), 0);
 
-  // Calories: good if below target
   const calOnTrack = totalCalories <= calorieTarget && totalCalories > 0;
-  // Protein: good if at or above target
   const protOnTrack = totalProtein >= proteinTarget;
 
-  const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-
-  // Sort meals: newest first
   const sortedMeals = useMemo(
     () => [...meals].sort((a, b) => Number(b.loggedAt) - Number(a.loggedAt)),
     [meals]
@@ -216,21 +402,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
-      {/* Date navigation */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={() => setSelectedDate((d) => subDays(d, 1))}>
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <div className="text-center">
-          <h2 className="text-lg font-bold text-foreground">
-            {isToday ? "Today" : format(selectedDate, "EEEE")}
-          </h2>
-          <p className="text-xs text-muted-foreground">{format(selectedDate, "MMMM d, yyyy")}</p>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => setSelectedDate((d) => addDays(d, 1))}>
-          <ChevronRight className="h-5 w-5" />
-        </Button>
-      </div>
+      {/* ── Weekly Day Selector ── */}
+      <WeekDaySelector selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
       {/* ── Separate Calorie & Protein Cards ── */}
       <div className="grid grid-cols-2 gap-2.5">
@@ -256,7 +429,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── 2×2 Meal Category Grid ── */}
+      {/* ── 2x2 Meal Category Grid ── */}
       <div className="grid grid-cols-2 gap-2">
         {(Object.entries(mealTypeConfig) as [MealType, (typeof mealTypeConfig)[MealType]][]).map(
           ([type, config]) => (
@@ -329,72 +502,16 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Meal cards */}
+        {/* Meal cards — horizontal layout with large photo */}
         <div className="space-y-2">
-          {sortedMeals.map((meal) => {
-            const config = mealTypeConfig[meal.mealType as MealType];
-            const tags = meal.tags ? (meal.tags as string).split(",").filter(Boolean) : [];
-            const logTime = format(new Date(Number(meal.loggedAt)), "HH:mm");
-
-            return (
-              <Card key={meal.id} className="overflow-hidden">
-                <CardContent className="p-3 flex items-start gap-2.5">
-                  {/* Photo or icon */}
-                  <MealIcon meal={meal} />
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{meal.mealName}</p>
-                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {config?.shortLabel}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">&bull;</span>
-                      <span className="text-[10px] font-semibold" style={{ color: CAL_COLOR }}>
-                        {Math.round(Number(meal.calories))} KCAL
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">&bull;</span>
-                      <span className="text-[10px] font-semibold" style={{ color: PROT_COLOR }}>
-                        {Math.round(Number(meal.protein))}G PROTEIN
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">&bull;</span>
-                      <span className="text-[10px] text-muted-foreground">{logTime}</span>
-                    </div>
-                    {tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="inline-block text-[9px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5 uppercase tracking-wider"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-                    <Button
-                      variant="ghost" size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      onClick={() => setEditMeal(meal)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost" size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMeal.mutate({ id: meal.id })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {sortedMeals.map((meal) => (
+            <MealCard
+              key={meal.id}
+              meal={meal}
+              onEdit={() => setEditMeal(meal)}
+              onDelete={() => deleteMeal.mutate({ id: meal.id })}
+            />
+          ))}
         </div>
 
         {meals.length === 0 && (
