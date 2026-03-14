@@ -1,0 +1,31 @@
+Google Sheets API v4 - Append Values:
+- POST https://sheets.googleapis.com/v4/spreadsheets/{spreadsheetId}/values/{range}:append
+- Requires OAuth scope: https://www.googleapis.com/auth/spreadsheets
+- Query params: valueInputOption (USER_ENTERED or RAW), insertDataOption (INSERT_ROWS or OVERWRITE)
+- Request body: ValueRange object with values array
+- Problem: Requires OAuth 2.0 authentication - cannot use simple API key for WRITE operations
+- API key only works for READ on public sheets
+
+Alternative approach: Since the user wants a simple paste-URL approach without OAuth:
+- Option 1: Use Google Apps Script web app as a proxy (user deploys a script)
+- Option 2: Use the Google Sheets API with a service account (requires sharing sheet with service account email)
+- Option 3: Use the built-in Manus data API if available
+
+Best approach for simplicity: Ask user for a Google API key or use a service account approach.
+Actually, the simplest approach that works: Use the Google Sheets API with an API key for the user.
+But writes require OAuth...
+
+Simplest real approach: Create a Google Apps Script web app that accepts POST requests and writes to the sheet. The user deploys this once and pastes the web app URL.
+
+OR: Use the Google Sheets API with a service account. The user shares the sheet with the service account email.
+
+For the user's case, the most practical approach is:
+1. Ask user for a Google Cloud API key with Sheets API enabled (for reading)
+2. For writing, we need OAuth or service account
+3. Best UX: Ask user to create a Google Cloud service account, download the JSON key, and share the sheet with the service account email
+
+Actually the SIMPLEST approach: Use Google Apps Script deployed as web app.
+The user creates a simple Apps Script, deploys it, and pastes the URL.
+Then our app POSTs data to that URL.
+
+This is the most user-friendly approach that doesn't require API keys or service accounts.

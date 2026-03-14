@@ -30,3 +30,12 @@
 - [x] Tags support for meals (DB + UI)
 - [x] Meal type icon fallback when no photo
 - [x] New meals appear at top of intake log
+- [x] Fix mobile text overflow on calorie/protein cards
+- [x] Add green border + arrow icon visual indicators for on-track/exceeded on both cards
+- [x] Reduce breakfast/lunch/dinner/snack card height
+- [x] Fix plus sign alignment on meal category cards
+- [x] Fix Google Sheets sync to actually write data to the sheet via Google Service Account API
+- [x] Install googleapis dependency
+- [x] Backend: implement Google Sheets write using service account credentials
+- [x] Settings page: add service account email display and setup instructions
+- [x] Request GOOGLE_SERVICE_ACCOUNT_KEY secret from user

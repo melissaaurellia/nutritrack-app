@@ -14,6 +14,9 @@ import {
   Sun,
   Moon,
   Apple,
+  TrendingDown,
+  TrendingUp,
+  CheckCircle2,
 } from "lucide-react";
 import { format, startOfDay, endOfDay, addDays, subDays } from "date-fns";
 import AddMealDialog from "@/components/AddMealDialog";
@@ -38,7 +41,7 @@ function DonutChart({
   value,
   target,
   color,
-  size = 80,
+  size = 64,
 }: {
   value: number;
   target: number;
@@ -51,7 +54,7 @@ function DonutChart({
   const strokeDashoffset = circumference - (pct / 100) * circumference;
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
         <circle cx="40" cy="40" r={radius} fill="none" stroke="currentColor" className="text-muted/30" strokeWidth="7" />
         <circle
@@ -64,7 +67,7 @@ function DonutChart({
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-base font-bold text-foreground">{Math.round(value)}</span>
+        <span className="text-xs font-bold text-foreground">{Math.round(value)}</span>
       </div>
     </div>
   );
@@ -78,6 +81,8 @@ function MacroCard({
   unit,
   color,
   isGood,
+  goodLabel,
+  badLabel,
 }: {
   label: string;
   value: number;
@@ -85,24 +90,40 @@ function MacroCard({
   unit: string;
   color: string;
   isGood: boolean;
+  goodLabel: string;
+  badLabel: string;
 }) {
   const remaining = target - value;
+  const donutColor = isGood ? "oklch(0.60 0.19 145)" : color;
+
   return (
-    <Card className={`flex-1 transition-all ${isGood ? "ring-2 ring-green-400/60 bg-green-50/40" : ""}`}>
-      <CardContent className="p-4 flex items-center gap-3">
-        <DonutChart value={value} target={target} color={isGood ? "oklch(0.60 0.19 145)" : color} />
+    <Card className={`flex-1 min-w-0 transition-all ${isGood ? "border-green-400 bg-green-50/50" : "border-border"}`}>
+      <CardContent className="p-3 flex items-center gap-2.5">
+        <DonutChart value={value} target={target} color={donutColor} size={56} />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">
-            {Math.round(value)} <span className="text-xs font-normal text-muted-foreground">/ {target} {unit}</span>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+          <p className="text-sm font-bold text-foreground truncate">
+            {Math.round(value)}<span className="text-[10px] font-normal text-muted-foreground"> / {target} {unit}</span>
           </p>
-          {isGood ? (
-            <p className="text-xs font-semibold text-green-600 mt-0.5">On track!</p>
-          ) : (
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {remaining >= 0 ? `${Math.round(remaining)} ${unit} left` : `${Math.round(Math.abs(remaining))} ${unit} over`}
-            </p>
-          )}
+          <div className="flex items-center gap-1 mt-0.5">
+            {isGood ? (
+              <>
+                <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />
+                <span className="text-[10px] font-semibold text-green-600 truncate">{goodLabel}</span>
+              </>
+            ) : (
+              <>
+                {remaining >= 0 ? (
+                  <TrendingDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                ) : (
+                  <TrendingUp className="h-3 w-3 text-red-500 shrink-0" />
+                )}
+                <span className="text-[10px] text-muted-foreground truncate">
+                  {remaining >= 0 ? `${Math.round(remaining)} ${unit} left` : badLabel}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -113,7 +134,7 @@ function MacroCard({
 function MealIcon({ meal }: { meal: any }) {
   if (meal.photoUrl) {
     return (
-      <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 border border-border">
+      <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border">
         <img src={meal.photoUrl} alt="" className="w-full h-full object-cover" />
       </div>
     );
@@ -122,8 +143,8 @@ function MealIcon({ meal }: { meal: any }) {
   const IconComp = config?.Icon ?? Coffee;
   const iconBg = config?.iconBg ?? "bg-muted text-muted-foreground";
   return (
-    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-      <IconComp className="h-5 w-5" />
+    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+      <IconComp className="h-4 w-4" />
     </div>
   );
 }
@@ -150,7 +171,14 @@ export default function Dashboard() {
   });
 
   const syncSheets = trpc.sheets.sync.useMutation({
-    onSuccess: () => { toast.success("Sync data prepared!"); setSyncing(false); },
+    onSuccess: (data) => {
+      if (data.written) {
+        toast.success("Synced to Google Sheets!");
+      } else {
+        toast.success("Sync data prepared! Copy it to your sheet.");
+      }
+      setSyncing(false);
+    },
     onError: (err) => { toast.error(err.message); setSyncing(false); },
   });
 
@@ -159,7 +187,9 @@ export default function Dashboard() {
   const totalCalories = meals.reduce((sum, m) => sum + Number(m.calories), 0);
   const totalProtein = meals.reduce((sum, m) => sum + Number(m.protein), 0);
 
+  // Calories: good if below target
   const calOnTrack = totalCalories <= calorieTarget && totalCalories > 0;
+  // Protein: good if at or above target
   const protOnTrack = totalProtein >= proteinTarget;
 
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
@@ -203,7 +233,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Separate Calorie & Protein Cards ── */}
-      <div className="flex gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <MacroCard
           label="Calories"
           value={totalCalories}
@@ -211,6 +241,8 @@ export default function Dashboard() {
           unit="kcal"
           color={CAL_COLOR}
           isGood={calOnTrack}
+          goodLabel="On track!"
+          badLabel={`${Math.round(totalCalories - calorieTarget)} over`}
         />
         <MacroCard
           label="Protein"
@@ -219,6 +251,8 @@ export default function Dashboard() {
           unit="g"
           color={PROT_COLOR}
           isGood={protOnTrack}
+          goodLabel="Goal met!"
+          badLabel={`${Math.round(proteinTarget - totalProtein)}g short`}
         />
       </div>
 
@@ -231,11 +265,13 @@ export default function Dashboard() {
               className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
               onClick={() => handleAddMeal(type)}
             >
-              <CardContent className="p-4 flex items-center gap-3">
-                <span className="text-2xl">{config.emoji}</span>
-                <span className="text-sm font-semibold text-foreground flex-1">{config.label}</span>
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-                  <Plus className="h-4 w-4 text-primary-foreground" />
+              <CardContent className="px-3 py-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xl shrink-0">{config.emoji}</span>
+                  <span className="text-sm font-semibold text-foreground truncate">{config.label}</span>
+                </div>
+                <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center shrink-0 ml-2">
+                  <Plus className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
               </CardContent>
             </Card>
@@ -255,17 +291,17 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Sync result */}
-        {syncSheets.data && (
-          <Card className="mb-3 border-green-200 bg-green-50">
+        {/* Sync result (fallback when API write fails) */}
+        {syncSheets.data && !syncSheets.data.written && (
+          <Card className="mb-3 border-amber-200 bg-amber-50">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold text-green-800 mb-2">Copy this to your Google Sheet:</p>
-              <div className="bg-white rounded p-2 text-xs font-mono space-y-0.5 border">
+              <p className="text-xs font-semibold text-amber-800 mb-2">Could not write to sheet directly. Copy this data manually:</p>
+              <div className="bg-white rounded p-2 text-xs font-mono space-y-0.5 border overflow-x-auto">
                 <p><span className="text-muted-foreground">Date:</span> {syncSheets.data.date}</p>
                 <p><span className="text-muted-foreground">Day:</span> {syncSheets.data.day}</p>
                 <p><span className="text-muted-foreground">Calories:</span> {syncSheets.data.calories}</p>
                 <p><span className="text-muted-foreground">Protein:</span> {syncSheets.data.protein}</p>
-                <p className="whitespace-pre-wrap"><span className="text-muted-foreground">Meals:</span>{"\n"}{syncSheets.data.meals}</p>
+                <p className="whitespace-pre-wrap break-words"><span className="text-muted-foreground">Meals:</span>{"\n"}{syncSheets.data.meals}</p>
               </div>
               <Button
                 size="sm" variant="outline" className="mt-2 text-xs"
@@ -281,6 +317,18 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {/* Success message when written to sheet */}
+        {syncSheets.data?.written && (
+          <Card className="mb-3 border-green-200 bg-green-50">
+            <CardContent className="p-3 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+              <p className="text-xs font-semibold text-green-800">
+                Data synced to Google Sheets! Check your spreadsheet for the updated row.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Meal cards */}
         <div className="space-y-2">
           {sortedMeals.map((meal) => {
@@ -290,14 +338,14 @@ export default function Dashboard() {
 
             return (
               <Card key={meal.id} className="overflow-hidden">
-                <CardContent className="p-3 flex items-start gap-3">
+                <CardContent className="p-3 flex items-start gap-2.5">
                   {/* Photo or icon */}
                   <MealIcon meal={meal} />
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{meal.mealName}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {config?.shortLabel}
                       </span>
@@ -313,11 +361,11 @@ export default function Dashboard() {
                       <span className="text-[10px] text-muted-foreground">{logTime}</span>
                     </div>
                     {tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
+                      <div className="flex flex-wrap gap-1 mt-1">
                         {tags.map((tag) => (
                           <span
                             key={tag}
-                            className="inline-block text-[10px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5 uppercase tracking-wider"
+                            className="inline-block text-[9px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5 uppercase tracking-wider"
                           >
                             {tag}
                           </span>

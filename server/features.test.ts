@@ -333,7 +333,8 @@ describe("sheets.sync", () => {
   });
 
   it("returns formatted sync data when sheet is configured", async () => {
-    const { ctx } = createAuthContext(889);
+    const uid = 88900 + Math.floor(Math.random() * 10000);
+    const { ctx } = createAuthContext(uid);
     const caller = appRouter.createCaller(ctx);
 
     // Configure sheet URL
@@ -371,6 +372,8 @@ describe("sheets.sync", () => {
     expect(result.meals).toContain("550 cal");
     expect(result.meals).toContain("15g protein");
     expect(result.sheetId).toBe("abc123");
+    // written may be false since we use a fake sheet ID
+    expect(typeof result.written).toBe("boolean");
   });
 
   it("requires authentication", async () => {

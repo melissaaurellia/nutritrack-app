@@ -20,6 +20,7 @@ import {
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import { syncRowToSheet, getServiceAccountEmail } from "./googleSheets";
 
 export const appRouter = router({
   system: systemRouter,
@@ -330,6 +331,10 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
 
   // ─── Google Sheets Sync ─────────────────────────────────────
   sheets: router({
+    serviceAccountEmail: protectedProcedure.query(() => {
+      return { email: getServiceAccountEmail() };
+    }),
+
     sync: protectedProcedure
       .input(
         z.object({
@@ -401,14 +406,28 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
         // Format date as D/M/YYYY
         const formattedDate = `${dateObj.getUTCDate()}/${dateObj.getUTCMonth() + 1}/${dateObj.getUTCFullYear()}`;
 
+        const sheetName = settings.googleSheetName || "Sheet1";
+
+        // Attempt to write directly to Google Sheets via service account
+        const writeResult = await syncRowToSheet(sheetId!, sheetName, {
+          date: formattedDate,
+          day: dayName,
+          calories: Math.round(totalCalories),
+          protein: Math.round(totalProtein),
+          meals: mealsString,
+        });
+
         return {
           date: formattedDate,
           day: dayName,
           calories: Math.round(totalCalories),
           protein: Math.round(totalProtein),
           meals: mealsString,
-          sheetId,
-          sheetName: settings.googleSheetName || "Sheet1",
+          sheetId: sheetId!,
+          sheetName,
+          written: writeResult.success,
+          writeAction: writeResult.action,
+          writeError: writeResult.error,
         };
       }),
   }),
