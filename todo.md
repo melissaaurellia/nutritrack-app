@@ -50,3 +50,6 @@
 - [x] Replace date left/right navigation with weekly day selector strip (Mon-Sun with date numbers)
 - [x] Redesign intake log cards with larger photo/icon on left in horizontal card layout
 - [x] BUG: Photo analysis still returns multiple items instead of one combined meal entry
+- [x] BUG: Photo analysis STILL returns multiple items (e.g., steak, sauce, salad as separate entries) - must return exactly ONE combined entry
+- [x] Ensure description textbox is present after photo capture, before "Analyze Meal" button
+- [x] Frontend must only render ONE meal item from photo analysis, not multiple

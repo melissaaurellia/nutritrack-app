@@ -255,41 +255,33 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        const descriptionHint = input.userDescription
-          ? ` The user says this meal is: "${input.userDescription}".`
-          : "";
+        const userDesc = input.userDescription?.trim();
+
+        const systemPrompt = `You are a nutrition estimation assistant. Your job is to look at a photo of a meal and return a SINGLE JSON object with the combined nutritional totals.
+
+IMPORTANT RULES:
+1. You MUST return exactly ONE meal entry that represents the ENTIRE plate/photo.
+2. The "name" field should be a short, natural description of the whole dish (e.g. "Sliced beef steak with sauce and salad", "Chicken rice bowl with vegetables", "Birria tacos with consomme").
+3. The "calories" field must be the TOTAL calories of EVERYTHING visible in the photo added together (main dish + sides + sauces + garnishes + drinks if visible).
+4. The "protein" field must be the TOTAL protein in grams of EVERYTHING visible added together.
+5. Do NOT break the meal into separate components. Do NOT list ingredients individually. There is only ONE entry.
+6. The "quantity" must always be 1 and "servingType" must always be "serving".
+7. The "description" should briefly describe what you see in 1-2 sentences.${userDesc ? `\n\nThe user describes this meal as: "${userDesc}". Use this to improve your name and estimation.` : ""}`;
 
         const result = await invokeLLM({
           messages: [
             {
               role: "system",
-              content: `You are a nutrition analysis expert. You MUST return EXACTLY ONE JSON object representing the ENTIRE meal as a SINGLE combined entry.
-
-CRITICAL RULES:
-- NEVER list individual ingredients or components separately
-- ALWAYS combine everything visible into ONE single meal name with TOTAL calories and protein
-- The "name" should be a concise descriptive name for the whole plate/meal (e.g. "Birria tacos with consomme" NOT separate entries for tacos, broth, lime)
-- Sum up ALL calories and protein from everything visible into the single entry
-- If there are sides, garnishes, or accompaniments, include their nutrition in the totals but do NOT create separate entries${descriptionHint}
-
-Return ONLY this exact JSON structure:
-{
-  "name": "single descriptive name for the entire meal",
-  "calories": total_calories_as_number,
-  "protein": total_protein_in_grams_as_number,
-  "quantity": 1,
-  "servingType": "serving",
-  "description": "brief description of what you see"
-}`,
+              content: systemPrompt,
             },
             {
               role: "user",
               content: [
                 {
                   type: "text",
-                  text: input.userDescription
-                    ? `Analyze this meal photo as ONE single entry. The meal is: ${input.userDescription}`
-                    : "Analyze this meal photo and return ONE single combined entry with total nutrition.",
+                  text: userDesc
+                    ? `This meal is: ${userDesc}. Estimate the TOTAL calories and protein for the entire plate as ONE entry.`
+                    : "Estimate the TOTAL calories and protein for this entire meal as ONE single entry.",
                 },
                 {
                   type: "image_url",
@@ -304,17 +296,35 @@ Return ONLY this exact JSON structure:
           response_format: {
             type: "json_schema",
             json_schema: {
-              name: "food_analysis",
+              name: "single_meal_analysis",
               strict: true,
               schema: {
                 type: "object",
                 properties: {
-                  name: { type: "string" },
-                  calories: { type: "number" },
-                  protein: { type: "number" },
-                  quantity: { type: "number" },
-                  servingType: { type: "string" },
-                  description: { type: "string" },
+                  name: {
+                    type: "string",
+                    description: "A short natural name for the entire meal, e.g. 'Grilled salmon with rice and salad'",
+                  },
+                  calories: {
+                    type: "number",
+                    description: "Total calories for everything in the photo combined",
+                  },
+                  protein: {
+                    type: "number",
+                    description: "Total protein in grams for everything in the photo combined",
+                  },
+                  quantity: {
+                    type: "number",
+                    description: "Always 1",
+                  },
+                  servingType: {
+                    type: "string",
+                    description: "Always 'serving'",
+                  },
+                  description: {
+                    type: "string",
+                    description: "Brief 1-2 sentence description of what is visible in the photo",
+                  },
                 },
                 required: ["name", "calories", "protein", "quantity", "servingType", "description"],
                 additionalProperties: false,
@@ -324,35 +334,51 @@ Return ONLY this exact JSON structure:
         });
 
         const content = result.choices[0]?.message?.content;
-        if (typeof content === "string") {
-          const parsed = JSON.parse(content);
-          // Server-side safeguard: if the model somehow returns an array or items array, merge them
-          if (Array.isArray(parsed)) {
-            const merged = {
-              name: parsed.map((i: any) => i.name).join(" + "),
-              calories: parsed.reduce((sum: number, i: any) => sum + (i.calories || 0), 0),
-              protein: parsed.reduce((sum: number, i: any) => sum + (i.protein || 0), 0),
-              quantity: 1,
-              servingType: "serving",
-              description: parsed.map((i: any) => i.description || i.name).join("; "),
-            };
-            return merged;
-          }
-          if (parsed.items && Array.isArray(parsed.items)) {
-            const items = parsed.items;
-            const merged = {
-              name: items.map((i: any) => i.name).join(" + "),
-              calories: items.reduce((sum: number, i: any) => sum + (i.calories || 0), 0),
-              protein: items.reduce((sum: number, i: any) => sum + (i.protein || 0), 0),
-              quantity: 1,
-              servingType: "serving",
-              description: parsed.description || items.map((i: any) => i.name).join(", "),
-            };
-            return merged;
-          }
-          return parsed;
+        if (typeof content !== "string") {
+          throw new Error("Failed to analyze image — no response from AI");
         }
-        throw new Error("Failed to analyze image");
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(content);
+        } catch {
+          throw new Error("Failed to parse AI response");
+        }
+
+        // Server-side safeguard: merge if model somehow returns an array
+        if (Array.isArray(parsed)) {
+          return {
+            name: parsed.map((i: any) => i.name).join(" with "),
+            calories: parsed.reduce((sum: number, i: any) => sum + (Number(i.calories) || 0), 0),
+            protein: parsed.reduce((sum: number, i: any) => sum + (Number(i.protein) || 0), 0),
+            quantity: 1,
+            servingType: "serving",
+            description: parsed.map((i: any) => i.description || i.name).join(". "),
+          };
+        }
+
+        // Safeguard: merge if model wraps items in an "items" array
+        if (parsed.items && Array.isArray(parsed.items)) {
+          const items = parsed.items;
+          return {
+            name: items.map((i: any) => i.name).join(" with "),
+            calories: items.reduce((sum: number, i: any) => sum + (Number(i.calories) || 0), 0),
+            protein: items.reduce((sum: number, i: any) => sum + (Number(i.protein) || 0), 0),
+            quantity: 1,
+            servingType: "serving",
+            description: parsed.description || items.map((i: any) => i.name).join(", "),
+          };
+        }
+
+        // Ensure quantity and servingType are always correct
+        return {
+          name: String(parsed.name || "Meal"),
+          calories: Number(parsed.calories) || 0,
+          protein: Number(parsed.protein) || 0,
+          quantity: 1,
+          servingType: "serving",
+          description: String(parsed.description || ""),
+        };
       }),
   }),
 
