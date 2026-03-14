@@ -256,25 +256,31 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const descriptionHint = input.userDescription
-          ? `\nThe user describes this meal as: "${input.userDescription}". Use this to improve your analysis.`
+          ? ` The user says this meal is: "${input.userDescription}".`
           : "";
 
         const result = await invokeLLM({
           messages: [
             {
               role: "system",
-              content: `You are a nutrition analysis expert. Analyze the food in the image and estimate the TOTAL calories and protein content for the ENTIRE meal as a single combined entry. Do NOT break the meal into separate ingredients — return one item representing the whole dish/meal.${descriptionHint}
+              content: `You are a nutrition analysis expert. You MUST return EXACTLY ONE JSON object representing the ENTIRE meal as a SINGLE combined entry.
 
-Return a JSON object with the following structure:
+CRITICAL RULES:
+- NEVER list individual ingredients or components separately
+- ALWAYS combine everything visible into ONE single meal name with TOTAL calories and protein
+- The "name" should be a concise descriptive name for the whole plate/meal (e.g. "Birria tacos with consomme" NOT separate entries for tacos, broth, lime)
+- Sum up ALL calories and protein from everything visible into the single entry
+- If there are sides, garnishes, or accompaniments, include their nutrition in the totals but do NOT create separate entries${descriptionHint}
+
+Return ONLY this exact JSON structure:
 {
-  "name": "descriptive name of the whole meal",
-  "calories": total_estimated_calories_number,
-  "protein": total_estimated_protein_grams_number,
+  "name": "single descriptive name for the entire meal",
+  "calories": total_calories_as_number,
+  "protein": total_protein_in_grams_as_number,
   "quantity": 1,
   "servingType": "serving",
-  "description": "brief description of what you see in the image and how you estimated the nutrition"
-}
-Be reasonable with estimates. If you cannot identify the food clearly, provide your best estimate and note uncertainty in the description.`,
+  "description": "brief description of what you see"
+}`,
             },
             {
               role: "user",
@@ -282,8 +288,8 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
                 {
                   type: "text",
                   text: input.userDescription
-                    ? `Please analyze this food image. The meal is: ${input.userDescription}`
-                    : "Please analyze this food image and estimate the nutritional content (calories and protein).",
+                    ? `Analyze this meal photo as ONE single entry. The meal is: ${input.userDescription}`
+                    : "Analyze this meal photo and return ONE single combined entry with total nutrition.",
                 },
                 {
                   type: "image_url",
@@ -319,7 +325,32 @@ Be reasonable with estimates. If you cannot identify the food clearly, provide y
 
         const content = result.choices[0]?.message?.content;
         if (typeof content === "string") {
-          return JSON.parse(content);
+          const parsed = JSON.parse(content);
+          // Server-side safeguard: if the model somehow returns an array or items array, merge them
+          if (Array.isArray(parsed)) {
+            const merged = {
+              name: parsed.map((i: any) => i.name).join(" + "),
+              calories: parsed.reduce((sum: number, i: any) => sum + (i.calories || 0), 0),
+              protein: parsed.reduce((sum: number, i: any) => sum + (i.protein || 0), 0),
+              quantity: 1,
+              servingType: "serving",
+              description: parsed.map((i: any) => i.description || i.name).join("; "),
+            };
+            return merged;
+          }
+          if (parsed.items && Array.isArray(parsed.items)) {
+            const items = parsed.items;
+            const merged = {
+              name: items.map((i: any) => i.name).join(" + "),
+              calories: items.reduce((sum: number, i: any) => sum + (i.calories || 0), 0),
+              protein: items.reduce((sum: number, i: any) => sum + (i.protein || 0), 0),
+              quantity: 1,
+              servingType: "serving",
+              description: parsed.description || items.map((i: any) => i.name).join(", "),
+            };
+            return merged;
+          }
+          return parsed;
         }
         throw new Error("Failed to analyze image");
       }),

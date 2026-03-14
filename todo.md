@@ -49,3 +49,4 @@
 - [x] Make protein equally prominent as calories in library food selection
 - [x] Replace date left/right navigation with weekly day selector strip (Mon-Sun with date numbers)
 - [x] Redesign intake log cards with larger photo/icon on left in horizontal card layout
+- [x] BUG: Photo analysis still returns multiple items instead of one combined meal entry
