@@ -71,3 +71,6 @@
 - [x] Feature: Orange + button should let users choose meal type (breakfast/lunch/dinner/snack) in the dialog
 - [x] Feature: Add date and time fields to manual entry in AddMealDialog
 - [x] Feature: Replace Quick Add meal type buttons with 4 smart suggestions based on frequently/recently logged meals with time-of-day awareness
+- [x] UI: Change all "xxx cal" to "xxx kcal" (lowercase)
+- [x] UI: Change all "xxg Pro" to "xxg pro" (lowercase)
+- [x] UI: Ensure Quick Add stats line (xxx kcal · xxg pro) stays on one line, no wrapping

@@ -317,7 +317,7 @@ function MealCard({
             {Math.round(Number(meal.calories))} kcal
           </span>
           <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
-            {Math.round(Number(meal.protein))}g protein
+            {Math.round(Number(meal.protein))}g pro
           </span>
         </div>
 
@@ -438,8 +438,8 @@ function QuickAddSuggestions({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{s.mealName}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {Math.round(Number(s.calories))} cal · {Math.round(Number(s.protein))}g pro
+              <p className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap">
+                {Math.round(Number(s.calories))} kcal · {Math.round(Number(s.protein))}g pro
               </p>
               {s.frequency > 1 && (
                 <p className="text-[9px] text-muted-foreground/70 mt-0.5">

@@ -525,7 +525,7 @@ export default function Settings() {
           <Separator />
           <p className="text-[10px] text-muted-foreground">
             <strong>Meals format:</strong>{" "}
-            <code className="bg-background px-1 rounded">Bfast: meal - XXX cal, XXg protein</code>
+            <code className="bg-background px-1 rounded">Bfast: meal - XXX kcal, XXg pro</code>
           </p>
         </div>
       </div>

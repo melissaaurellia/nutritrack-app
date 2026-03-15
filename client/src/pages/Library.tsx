@@ -174,7 +174,7 @@ export default function Library() {
                     {Math.round(Number(item.calories))} kcal
                   </span>
                   <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
-                    {Math.round(Number(item.protein))}g protein
+                    {Math.round(Number(item.protein))}g pro
                   </span>
                 </div>
               </div>

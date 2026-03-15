@@ -383,10 +383,10 @@ export default function AddMealDialog({
                       </div>
                       <div className="text-right shrink-0 space-y-0.5">
                         <p className="text-sm font-semibold" style={{ color: "oklch(0.65 0.18 55)" }}>
-                          {Math.round(Number(item.calories))} Cal
+                          {Math.round(Number(item.calories))} kcal
                         </p>
                         <p className="text-sm font-semibold" style={{ color: "oklch(0.35 0.1 260)" }}>
-                          {Math.round(Number(item.protein))}g Pro
+                          {Math.round(Number(item.protein))}g pro
                         </p>
                       </div>
                     </div>
