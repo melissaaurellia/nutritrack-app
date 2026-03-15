@@ -27,6 +27,7 @@ import {
   ArrowUp,
   ArrowDown,
   Copy,
+  Zap,
 } from "lucide-react";
 import {
   format,
@@ -356,6 +357,106 @@ function MealCard({
   );
 }
 
+/* ─── Quick Add Suggestions ──────────────────────────────── */
+function QuickAddSuggestions({
+  onQuickLog,
+  onAddNew,
+}: {
+  onQuickLog: (suggestion: any) => void;
+  onAddNew: () => void;
+}) {
+  const [currentHour] = useState(() => new Date().getHours());
+  const { data: suggestions = [], isLoading } = trpc.meals.suggestions.useQuery({ currentHour });
+
+  const getMealEmoji = (mealType: string) => {
+    const map: Record<string, string> = { breakfast: "☀️", lunch: "🥗", dinner: "🍝", snack: "🍎" };
+    return map[mealType] || "🍽️";
+  };
+
+  const getPastelBg = (mealType: string) => {
+    const map: Record<string, string> = {
+      breakfast: "bg-gradient-to-br from-amber-50 to-orange-50",
+      lunch: "bg-gradient-to-br from-green-50 to-emerald-50",
+      dinner: "bg-gradient-to-br from-indigo-50 to-violet-50",
+      snack: "bg-gradient-to-br from-rose-50 to-pink-50",
+    };
+    return map[mealType] || "bg-gradient-to-br from-gray-50 to-slate-50";
+  };
+
+  if (isLoading) {
+    return (
+      <div>
+        <h3 className="text-base font-bold text-foreground mb-2">Quick Add</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-2xl h-[72px] bg-muted/40 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // If no suggestions yet, show a prompt to log meals
+  if (suggestions.length === 0) {
+    return (
+      <div>
+        <h3 className="text-base font-bold text-foreground mb-2">Quick Add</h3>
+        <button
+          onClick={onAddNew}
+          className="w-full rounded-2xl px-4 py-4 bg-gradient-to-br from-primary/5 to-primary/10 border border-dashed border-primary/20 flex items-center justify-center gap-2 transition-all hover:shadow-md active:scale-[0.98]"
+        >
+          <Plus className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium text-primary">Log your first meal to get smart suggestions</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-base font-bold text-foreground flex items-center gap-1.5">
+          <Zap className="h-4 w-4 text-amber-500" />
+          Quick Add
+        </h3>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {suggestions.map((s, i) => (
+          <button
+            key={i}
+            className={`rounded-2xl px-3 py-3 flex items-start gap-2.5 transition-all hover:shadow-md active:scale-[0.98] text-left ${getPastelBg(s.mealType)}`}
+            onClick={() => onQuickLog(s)}
+          >
+            {s.photoUrl ? (
+              <img
+                src={s.photoUrl}
+                alt=""
+                className="h-10 w-10 rounded-lg object-cover shrink-0"
+              />
+            ) : (
+              <span className="text-lg shrink-0 mt-0.5">{getMealEmoji(s.mealType)}</span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{s.mealName}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {Math.round(Number(s.calories))} cal · {Math.round(Number(s.protein))}g pro
+              </p>
+              {s.frequency > 1 && (
+                <p className="text-[9px] text-muted-foreground/70 mt-0.5">
+                  Logged {s.frequency}x
+                </p>
+              )}
+            </div>
+            <div className="h-6 w-6 rounded-full bg-white/70 flex items-center justify-center shrink-0 mt-0.5">
+              <Plus className="h-3 w-3 text-foreground/60" />
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Dashboard ──────────────────────────────────────── */
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -376,6 +477,11 @@ export default function Dashboard() {
 
   const deleteMeal = trpc.meals.delete.useMutation({
     onSuccess: () => { refetchMeals(); toast.success("Meal deleted"); },
+  });
+
+  const quickLogMeal = trpc.meals.create.useMutation({
+    onSuccess: () => { refetchMeals(); toast.success("Meal logged!"); },
+    onError: (err) => { toast.error(err.message); },
   });
 
   const syncSheets = trpc.sheets.sync.useMutation({
@@ -464,29 +570,21 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── Quick Add — 2x2 Meal Category Grid ── */}
-      <div>
-        <h3 className="text-base font-bold text-foreground mb-2">Quick Add</h3>
-      <div className="grid grid-cols-2 gap-2">
-        {(Object.entries(mealTypeConfig) as [MealType, (typeof mealTypeConfig)[MealType]][]).map(
-          ([type, config]) => (
-            <button
-              key={type}
-              className={`rounded-2xl px-4 py-3 flex items-center justify-between transition-all hover:shadow-md active:scale-[0.98] ${config.pastelBg}`}
-              onClick={() => handleAddMeal(type)}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xl shrink-0">{config.emoji}</span>
-                <span className="text-sm font-semibold text-foreground truncate">{config.label}</span>
-              </div>
-              <div className="h-7 w-7 rounded-full bg-white/70 flex items-center justify-center shrink-0 ml-2">
-                <Plus className="h-3.5 w-3.5 text-foreground/60" />
-              </div>
-            </button>
-          )
-        )}
-      </div>
-      </div>
+      {/* ── Quick Add — Smart Suggestions ── */}
+      <QuickAddSuggestions
+        onQuickLog={(suggestion) => {
+          quickLogMeal.mutate({
+            mealName: suggestion.mealName,
+            mealType: suggestion.mealType as MealType,
+            calories: Number(suggestion.calories),
+            protein: Number(suggestion.protein),
+            quantity: suggestion.quantity ? Number(suggestion.quantity) : undefined,
+            servingType: suggestion.servingType ?? undefined,
+            loggedAt: selectedDate.getTime() || Date.now(),
+          });
+        }}
+        onAddNew={() => handleAddMeal("breakfast")}
+      />
 
       {/* ── Intake Log ── */}
       <div>

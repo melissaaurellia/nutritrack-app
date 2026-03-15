@@ -92,6 +92,108 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+// ─── Quick Add Suggestions ─────────────────────────────────────
+
+/**
+ * Get smart meal suggestions based on frequency and time-of-day patterns.
+ * Returns up to 4 suggestions, prioritizing meals frequently logged at the current time of day.
+ */
+export async function getQuickAddSuggestions(userId: number, currentHour: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Determine the current meal period based on hour
+  let currentMealType: string;
+  if (currentHour >= 5 && currentHour < 11) currentMealType = "breakfast";
+  else if (currentHour >= 11 && currentHour < 15) currentMealType = "lunch";
+  else if (currentHour >= 15 && currentHour < 20) currentMealType = "dinner";
+  else currentMealType = "snack";
+
+  // Get all meals for this user, ordered by most recent
+  const allMeals = await db
+    .select({
+      mealName: mealLogs.mealName,
+      mealType: mealLogs.mealType,
+      calories: mealLogs.calories,
+      protein: mealLogs.protein,
+      quantity: mealLogs.quantity,
+      servingType: mealLogs.servingType,
+      photoUrl: mealLogs.photoUrl,
+      loggedAt: mealLogs.loggedAt,
+    })
+    .from(mealLogs)
+    .where(eq(mealLogs.userId, userId))
+    .orderBy(desc(mealLogs.loggedAt))
+    .limit(500);
+
+  if (allMeals.length === 0) return [];
+
+  // Aggregate by meal name (case-insensitive)
+  const mealMap = new Map<string, {
+    mealName: string;
+    mealType: string;
+    calories: string;
+    protein: string;
+    quantity: string | null;
+    servingType: string | null;
+    photoUrl: string | null;
+    count: number;
+    timeMatchCount: number;
+    lastLoggedAt: number;
+  }>();
+
+  for (const m of allMeals) {
+    const key = m.mealName.toLowerCase().trim();
+    const existing = mealMap.get(key);
+    const isTimeMatch = m.mealType === currentMealType;
+
+    if (existing) {
+      existing.count += 1;
+      existing.timeMatchCount += isTimeMatch ? 1 : 0;
+      // Keep the most recent data
+      if (m.loggedAt > existing.lastLoggedAt) {
+        existing.mealName = m.mealName;
+        existing.mealType = m.mealType;
+        existing.calories = m.calories;
+        existing.protein = m.protein;
+        existing.quantity = m.quantity;
+        existing.servingType = m.servingType;
+        existing.photoUrl = m.photoUrl;
+        existing.lastLoggedAt = m.loggedAt;
+      }
+    } else {
+      mealMap.set(key, {
+        mealName: m.mealName,
+        mealType: m.mealType,
+        calories: m.calories,
+        protein: m.protein,
+        quantity: m.quantity,
+        servingType: m.servingType,
+        photoUrl: m.photoUrl,
+        count: 1,
+        timeMatchCount: isTimeMatch ? 1 : 0,
+        lastLoggedAt: m.loggedAt,
+      });
+    }
+  }
+
+  // Score: timeMatchCount * 3 + count * 1 + recency bonus
+  const now = Date.now();
+  const scored = Array.from(mealMap.values()).map((m) => {
+    const recencyDays = (now - m.lastLoggedAt) / (1000 * 60 * 60 * 24);
+    const recencyBonus = Math.max(0, 10 - recencyDays); // bonus for meals logged in last 10 days
+    const score = m.timeMatchCount * 3 + m.count * 1 + recencyBonus;
+    return { ...m, score };
+  });
+
+  // Sort by score descending, take top 4
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 4).map(({ score, count, timeMatchCount, lastLoggedAt, ...rest }) => ({
+    ...rest,
+    frequency: count,
+  }));
+}
+
 export async function updateUserName(userId: number, name: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

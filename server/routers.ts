@@ -22,6 +22,7 @@ import {
   deleteUserTag,
   getUsedTagsFromMeals,
   updateUserName,
+  getQuickAddSuggestions,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
@@ -177,6 +178,12 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         return deleteMealLog(input.id, ctx.user.id);
+      }),
+
+    suggestions: protectedProcedure
+      .input(z.object({ currentHour: z.number().min(0).max(23) }))
+      .query(async ({ ctx, input }) => {
+        return getQuickAddSuggestions(ctx.user.id, input.currentHour);
       }),
   }),
 
