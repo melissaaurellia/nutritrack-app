@@ -75,3 +75,9 @@
 - [x] UI: Change all "xxg Pro" to "xxg pro" (lowercase)
 - [x] UI: Ensure Quick Add stats line (xxx kcal · xxg pro) stays on one line, no wrapping
 - [x] Fix: Google Sheets sync should write each food entry as a separate line (not combined per meal type)
+- [x] Replace "Welcome" with "NutriTrack" on sign-in page
+- [x] Add email/password sign-up flow (backend + UI)
+- [x] Add email/password login flow (backend + UI)
+- [x] Add "Continue with Google" OAuth option on sign-in page
+- [x] Design sign-in/sign-up page matching reference screenshots (email fields, password with toggle, social login icons)
+- [x] Toggle between Sign In and Create Account views

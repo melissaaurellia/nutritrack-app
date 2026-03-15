@@ -1,14 +1,12 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
-import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { useEffect } from "react";
 import {
   LayoutDashboard,
   BookOpen,
   TrendingUp,
   Settings,
   Loader2,
-  UtensilsCrossed,
   Plus,
 } from "lucide-react";
 
@@ -28,35 +26,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { user, loading } = useAuth();
   const [location, setLocation] = useLocation();
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading && !user) {
+      setLocation("/");
+    }
+  }, [loading, user, setLocation]);
+
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-6 p-8 max-w-sm w-full text-center">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <UtensilsCrossed className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Welcome</h1>
-            <p className="text-muted-foreground text-sm">
-              Sign in to start tracking your nutrition goals
-            </p>
-          </div>
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            size="lg"
-            className="w-full"
-          >
-            Sign in to continue
-          </Button>
-        </div>
       </div>
     );
   }
