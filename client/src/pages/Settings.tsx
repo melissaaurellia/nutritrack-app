@@ -23,6 +23,7 @@ import {
   Trash2,
   X,
   Check,
+  User,
 } from "lucide-react";
 
 export default function Settings() {
@@ -76,6 +77,28 @@ export default function Settings() {
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetName, setSheetName] = useState("Sheet1");
   const [copied, setCopied] = useState(false);
+
+  // Username editing state
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState(user?.name || "");
+
+  const updateNameMutation = trpc.user.updateName.useMutation({
+    onSuccess: () => {
+      toast.success("Username updated");
+      setEditingName(false);
+      utils.auth.me.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const handleSaveName = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      toast.error("Username cannot be empty");
+      return;
+    }
+    updateNameMutation.mutate({ name: trimmed });
+  };
 
   // Tag management state
   const [newTagName, setNewTagName] = useState("");
@@ -165,13 +188,47 @@ export default function Settings() {
       <h1 className="text-xl font-bold text-foreground">Settings</h1>
 
       {/* Profile */}
-      <div className="rounded-2xl bg-card p-4 space-y-2">
-        <p className="text-sm font-semibold text-foreground">Profile</p>
-        <div className="flex items-center justify-between">
+      <div className="rounded-2xl bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-primary" />
+          <p className="text-sm font-semibold text-foreground">Profile</p>
+        </div>
+        <div className="space-y-3">
           <div>
-            <p className="text-sm font-medium">{user?.name || "User"}</p>
-            <p className="text-xs text-muted-foreground">{user?.email || ""}</p>
+            <Label className="text-xs mb-1">Username</Label>
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") { setEditingName(false); setNewName(user?.name || ""); } }}
+                  autoFocus
+                />
+                <Button size="sm" onClick={handleSaveName} disabled={updateNameMutation.isPending}>
+                  {updateNameMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditingName(false); setNewName(user?.name || ""); }}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">{user?.name || "User"}</p>
+                <Button variant="ghost" size="sm" onClick={() => { setNewName(user?.name || ""); setEditingName(true); }}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                </Button>
+              </div>
+            )}
           </div>
+          {user?.email && (
+            <div>
+              <Label className="text-xs mb-1">Email</Label>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+          )}
+          <Separator />
           <Button variant="outline" size="sm" onClick={logout}>
             <LogOut className="h-3.5 w-3.5 mr-1" /> Sign Out
           </Button>

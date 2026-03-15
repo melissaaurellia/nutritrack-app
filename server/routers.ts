@@ -21,6 +21,7 @@ import {
   updateUserTag,
   deleteUserTag,
   getUsedTagsFromMeals,
+  updateUserName,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
@@ -36,6 +37,15 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+  }),
+
+  // ─── User Profile ───────────────────────────────────────────
+  user: router({
+    updateName: protectedProcedure
+      .input(z.object({ name: z.string().min(1).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        return updateUserName(ctx.user.id, input.name.trim());
+      }),
   }),
 
   // ─── User Settings ──────────────────────────────────────────

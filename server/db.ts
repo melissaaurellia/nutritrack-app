@@ -92,6 +92,13 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function updateUserName(userId: number, name: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ name }).where(eq(users.id, userId));
+  return { success: true };
+}
+
 // ─── User Settings helpers ──────────────────────────────────────
 
 export async function getUserSettings(userId: number) {

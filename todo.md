@@ -67,3 +67,4 @@
 - [x] UI: Change meal type popup to bottom sheet that slides up from bottom of screen (not floating)
 - [x] UI: Remove bottom sheet popup from + button - clicking + should open AddMealDialog directly
 - [x] UI: Label the breakfast/lunch/dinner/snack 2x2 grid as "Quick Add"
+- [x] Feature: Allow users to change their username in Settings
