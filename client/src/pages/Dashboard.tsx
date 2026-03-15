@@ -464,7 +464,9 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── 2x2 Meal Category Grid — colorful pastel cards ── */}
+      {/* ── Quick Add — 2x2 Meal Category Grid ── */}
+      <div>
+        <h3 className="text-base font-bold text-foreground mb-2">Quick Add</h3>
       <div className="grid grid-cols-2 gap-2">
         {(Object.entries(mealTypeConfig) as [MealType, (typeof mealTypeConfig)[MealType]][]).map(
           ([type, config]) => (
@@ -483,6 +485,7 @@ export default function Dashboard() {
             </button>
           )
         )}
+      </div>
       </div>
 
       {/* ── Intake Log ── */}

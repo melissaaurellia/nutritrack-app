@@ -65,3 +65,5 @@
 - [x] UI: Remove username and logout button from top right (logout stays in Settings)
 - [x] UI: Make app more colorful with soft pastel category cards (inspired by reference designs)
 - [x] UI: Change meal type popup to bottom sheet that slides up from bottom of screen (not floating)
+- [x] UI: Remove bottom sheet popup from + button - clicking + should open AddMealDialog directly
+- [x] UI: Label the breakfast/lunch/dinner/snack 2x2 grid as "Quick Add"

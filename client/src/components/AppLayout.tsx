@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
@@ -11,14 +10,7 @@ import {
   Loader2,
   UtensilsCrossed,
   Plus,
-  X,
-  Coffee,
-  Sun,
-  Moon,
-  Apple,
 } from "lucide-react";
-
-type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -28,22 +20,13 @@ const navItems = [
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
-const mealTypes: { type: MealType; label: string; emoji: string; Icon: typeof Coffee; color: string; bg: string }[] = [
-  { type: "breakfast", label: "Breakfast", emoji: "☀️", Icon: Coffee, color: "text-amber-600", bg: "bg-amber-50" },
-  { type: "lunch", label: "Lunch", emoji: "🥗", Icon: Sun, color: "text-green-600", bg: "bg-green-50" },
-  { type: "dinner", label: "Dinner", emoji: "🍝", Icon: Moon, color: "text-indigo-600", bg: "bg-indigo-50" },
-  { type: "snack", label: "Snack", emoji: "🍎", Icon: Apple, color: "text-red-500", bg: "bg-red-50" },
-];
-
 interface AppLayoutProps {
   children: React.ReactNode;
-  onAddMeal?: (type: MealType) => void;
 }
 
-export default function AppLayout({ children, onAddMeal }: AppLayoutProps) {
+export default function AppLayout({ children }: AppLayoutProps) {
   const { user, loading } = useAuth();
   const [location, setLocation] = useLocation();
-  const [showMealPopup, setShowMealPopup] = useState(false);
 
   if (loading) {
     return (
@@ -78,18 +61,13 @@ export default function AppLayout({ children, onAddMeal }: AppLayoutProps) {
     );
   }
 
-  const handleMealSelect = (type: MealType) => {
-    setShowMealPopup(false);
-    if (onAddMeal) {
-      onAddMeal(type);
-    } else {
-      // Navigate to dashboard with meal type in state
-      if (location !== "/dashboard") {
-        setLocation("/dashboard");
-      }
-      // Dispatch custom event for Dashboard to pick up
-      window.dispatchEvent(new CustomEvent("add-meal", { detail: { type } }));
+  const handleAddMeal = () => {
+    // Navigate to dashboard if not already there
+    if (location !== "/dashboard") {
+      setLocation("/dashboard");
     }
+    // Dispatch event — Dashboard will open AddMealDialog with default type
+    window.dispatchEvent(new CustomEvent("add-meal", { detail: { type: "breakfast" } }));
   };
 
   return (
@@ -103,53 +81,6 @@ export default function AppLayout({ children, onAddMeal }: AppLayoutProps) {
 
       {/* ── Bottom Navigation - Mobile ── */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden">
-        {/* Bottom sheet overlay */}
-        {showMealPopup && (
-          <div
-            className="fixed inset-0 bg-black/30 z-40 transition-opacity"
-            onClick={() => setShowMealPopup(false)}
-          />
-        )}
-
-        {/* Bottom sheet — slides up from bottom */}
-        <div
-          className={`fixed left-0 right-0 z-50 transition-transform duration-300 ease-out ${
-            showMealPopup ? "translate-y-0" : "translate-y-full"
-          }`}
-          style={{ bottom: "64px" }}
-        >
-          <div className="bg-card rounded-t-3xl shadow-2xl px-5 pt-4 pb-6">
-            {/* Drag handle */}
-            <div className="flex justify-center mb-3">
-              <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-foreground">Add Meal</h3>
-              <button
-                onClick={() => setShowMealPopup(false)}
-                className="h-7 w-7 rounded-full bg-muted flex items-center justify-center"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              {mealTypes.map((mt) => (
-                <button
-                  key={mt.type}
-                  onClick={() => handleMealSelect(mt.type)}
-                  className={`${mt.bg} rounded-2xl p-3 flex flex-col items-center gap-2 transition-all active:scale-95 hover:shadow-sm`}
-                >
-                  <span className="text-2xl">{mt.emoji}</span>
-                  <span className={`text-[11px] font-semibold ${mt.color}`}>{mt.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Nav bar */}
         <div className="bg-card/95 backdrop-blur border-t border-border/40">
           <div className="flex items-center justify-around h-16 px-2 relative">
             {/* Left nav items */}
@@ -171,17 +102,13 @@ export default function AppLayout({ children, onAddMeal }: AppLayoutProps) {
               );
             })}
 
-            {/* Center + button — elevated circle */}
+            {/* Center + button — elevated circle, directly opens AddMealDialog */}
             <div className="relative -mt-6">
               <button
-                onClick={() => setShowMealPopup(!showMealPopup)}
-                className={`h-14 w-14 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 ${
-                  showMealPopup
-                    ? "bg-muted-foreground rotate-45"
-                    : "bg-primary"
-                }`}
+                onClick={handleAddMeal}
+                className="h-14 w-14 rounded-full bg-primary flex items-center justify-center shadow-lg transition-all active:scale-95"
               >
-                <Plus className={`h-7 w-7 ${showMealPopup ? "text-white" : "text-primary-foreground"}`} />
+                <Plus className="h-7 w-7 text-primary-foreground" />
               </button>
             </div>
 
