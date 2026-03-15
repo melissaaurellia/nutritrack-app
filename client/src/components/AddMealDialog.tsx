@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,8 +19,9 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Camera, Upload, Loader2, Search, BookOpen, PenLine } from "lucide-react";
+import { Camera, Upload, Loader2, Search, BookOpen, PenLine, Coffee, Sun, Moon, Apple } from "lucide-react";
 import TagInput from "@/components/TagInput";
+import { format } from "date-fns";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -34,14 +35,47 @@ interface AddMealDialogProps {
 
 const servingTypes = ["pieces", "grams", "plates", "cups", "bowls", "slices", "tablespoons", "servings", "ml"];
 
+const mealTypeOptions: { value: MealType; label: string; emoji: string; icon: typeof Coffee; color: string }[] = [
+  { value: "breakfast", label: "Breakfast", emoji: "☀️", icon: Coffee, color: "bg-amber-50 text-amber-700 border-amber-200" },
+  { value: "lunch", label: "Lunch", emoji: "🥗", icon: Sun, color: "bg-green-50 text-green-700 border-green-200" },
+  { value: "dinner", label: "Dinner", emoji: "🍝", icon: Moon, color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  { value: "snack", label: "Snack", emoji: "🍎", icon: Apple, color: "bg-rose-50 text-rose-700 border-rose-200" },
+];
+
 export default function AddMealDialog({
   open,
   onOpenChange,
-  mealType,
+  mealType: initialMealType,
   loggedAt,
   onSuccess,
 }: AddMealDialogProps) {
   const [tab, setTab] = useState("manual");
+
+  // Meal type state (user can change it in the dialog)
+  const [selectedMealType, setSelectedMealType] = useState<MealType>(initialMealType);
+
+  // Date/time state for manual entry
+  const [entryDate, setEntryDate] = useState(() => format(new Date(loggedAt), "yyyy-MM-dd"));
+  const [entryTime, setEntryTime] = useState(() => format(new Date(loggedAt), "HH:mm"));
+
+  // Sync when dialog opens with new props
+  useEffect(() => {
+    if (open) {
+      setSelectedMealType(initialMealType);
+      setEntryDate(format(new Date(loggedAt), "yyyy-MM-dd"));
+      setEntryTime(format(new Date(loggedAt), "HH:mm"));
+    }
+  }, [open, initialMealType, loggedAt]);
+
+  // Compute the actual loggedAt timestamp from date/time fields
+  const computedLoggedAt = (() => {
+    try {
+      const dt = new Date(`${entryDate}T${entryTime}:00`);
+      return isNaN(dt.getTime()) ? loggedAt : dt.getTime();
+    } catch {
+      return loggedAt;
+    }
+  })();
 
   // Manual form state
   const [mealName, setMealName] = useState("");
@@ -107,12 +141,12 @@ export default function AddMealDialog({
     }
     createMeal.mutate({
       mealName: mealName.trim(),
-      mealType,
+      mealType: selectedMealType,
       calories: parseFloat(calories) || 0,
       protein: parseFloat(protein) || 0,
       quantity: quantity ? parseFloat(quantity) : undefined,
       servingType: servingType || undefined,
-      loggedAt,
+      loggedAt: computedLoggedAt,
       addToLibrary,
       tags: tags.length > 0 ? tags : undefined,
     });
@@ -121,12 +155,12 @@ export default function AddMealDialog({
   const handleLibrarySelect = (item: (typeof libraryItems)[0]) => {
     createMeal.mutate({
       mealName: item.name,
-      mealType,
+      mealType: selectedMealType,
       calories: Number(item.calories),
       protein: Number(item.protein),
       quantity: item.defaultQuantity ? Number(item.defaultQuantity) : undefined,
       servingType: item.defaultServingType ?? undefined,
-      loggedAt,
+      loggedAt: computedLoggedAt,
     });
   };
 
@@ -170,26 +204,49 @@ export default function AddMealDialog({
     if (!analysisResult) return;
     createMeal.mutate({
       mealName: analysisResult.name,
-      mealType,
+      mealType: selectedMealType,
       calories: analysisResult.calories,
       protein: analysisResult.protein,
       quantity: analysisResult.quantity || undefined,
       servingType: analysisResult.servingType || undefined,
       photoUrl: analysisResult.photoUrl,
-      loggedAt,
+      loggedAt: computedLoggedAt,
       addToLibrary,
       tags: tags.length > 0 ? tags : undefined,
     });
   };
+
+  const currentMealLabel = mealTypeOptions.find((m) => m.value === selectedMealType)?.label || "Meal";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg">
-            Add {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+            Add Meal
           </DialogTitle>
         </DialogHeader>
+
+        {/* Meal Type Selector */}
+        <div className="grid grid-cols-4 gap-2">
+          {mealTypeOptions.map((opt) => {
+            const isActive = selectedMealType === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setSelectedMealType(opt.value)}
+                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border-2 transition-all text-center ${
+                  isActive
+                    ? `${opt.color} border-current font-semibold`
+                    : "bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/60"
+                }`}
+              >
+                <span className="text-lg">{opt.emoji}</span>
+                <span className="text-[10px] font-medium leading-tight">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className="w-full grid grid-cols-3">
@@ -256,6 +313,29 @@ export default function AddMealDialog({
                 </Select>
               </div>
             </div>
+
+            {/* Date & Time */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="entryDate" className="text-xs mb-1">Date</Label>
+                <Input
+                  id="entryDate"
+                  type="date"
+                  value={entryDate}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="entryTime" className="text-xs mb-1">Time</Label>
+                <Input
+                  id="entryTime"
+                  type="time"
+                  value={entryTime}
+                  onChange={(e) => setEntryTime(e.target.value)}
+                />
+              </div>
+            </div>
+
             <TagInput tags={tags} onTagsChange={setTags} />
             <div className="flex items-center justify-between py-2">
               <Label htmlFor="addToLib" className="text-xs">Add to Food Library</Label>
@@ -263,7 +343,7 @@ export default function AddMealDialog({
             </div>
             <Button onClick={handleManualSubmit} className="w-full" disabled={createMeal.isPending}>
               {createMeal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Log Meal
+              Log {currentMealLabel}
             </Button>
           </TabsContent>
 
@@ -413,7 +493,7 @@ export default function AddMealDialog({
                 </div>
                 <Button onClick={handlePhotoSubmit} className="w-full" disabled={createMeal.isPending}>
                   {createMeal.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Log Meal
+                  Log {currentMealLabel}
                 </Button>
               </div>
             )}

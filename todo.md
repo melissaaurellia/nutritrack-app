@@ -68,3 +68,5 @@
 - [x] UI: Remove bottom sheet popup from + button - clicking + should open AddMealDialog directly
 - [x] UI: Label the breakfast/lunch/dinner/snack 2x2 grid as "Quick Add"
 - [x] Feature: Allow users to change their username in Settings
+- [x] Feature: Orange + button should let users choose meal type (breakfast/lunch/dinner/snack) in the dialog
+- [x] Feature: Add date and time fields to manual entry in AddMealDialog
