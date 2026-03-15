@@ -477,32 +477,18 @@ IMPORTANT RULES:
           snack: "Snack",
         };
 
-        const groupedMeals: Record<string, string[]> = {
-          breakfast: [],
-          lunch: [],
-          dinner: [],
-          snack: [],
-        };
-
         let totalCalories = 0;
         let totalProtein = 0;
 
+        // Build one line per meal entry
+        const mealLines: string[] = [];
         for (const meal of meals) {
           const cal = Number(meal.calories);
           const prot = Number(meal.protein);
           totalCalories += cal;
           totalProtein += prot;
-          const label = `${meal.mealName} - ${Math.round(cal)} cal, ${Math.round(prot)}g protein`;
-          groupedMeals[meal.mealType].push(label);
-        }
-
-        // Build the meals column string
-        const mealLines: string[] = [];
-        for (const [type, label] of Object.entries(mealTypeLabels)) {
-          const items = groupedMeals[type];
-          if (items.length > 0) {
-            mealLines.push(`${label}: ${items.join(" + ")}`);
-          }
+          const typeLabel = mealTypeLabels[meal.mealType] || meal.mealType;
+          mealLines.push(`${typeLabel}: ${meal.mealName} - ${Math.round(cal)} kcal, ${Math.round(prot)}g pro`);
         }
         const mealsString = mealLines.join("\n");
 

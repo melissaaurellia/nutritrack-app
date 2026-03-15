@@ -74,3 +74,4 @@
 - [x] UI: Change all "xxx cal" to "xxx kcal" (lowercase)
 - [x] UI: Change all "xxg Pro" to "xxg pro" (lowercase)
 - [x] UI: Ensure Quick Add stats line (xxx kcal · xxg pro) stays on one line, no wrapping
+- [x] Fix: Google Sheets sync should write each food entry as a separate line (not combined per meal type)
