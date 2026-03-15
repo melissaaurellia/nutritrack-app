@@ -64,3 +64,4 @@
 - [x] UI: Redesign bottom nav with centered + button that opens meal type popup card
 - [x] UI: Remove username and logout button from top right (logout stays in Settings)
 - [x] UI: Make app more colorful with soft pastel category cards (inspired by reference designs)
+- [x] UI: Change meal type popup to bottom sheet that slides up from bottom of screen (not floating)

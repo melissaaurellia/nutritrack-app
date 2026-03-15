@@ -103,40 +103,51 @@ export default function AppLayout({ children, onAddMeal }: AppLayoutProps) {
 
       {/* ── Bottom Navigation - Mobile ── */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden">
-        {/* Meal type popup overlay */}
+        {/* Bottom sheet overlay */}
         {showMealPopup && (
           <div
-            className="fixed inset-0 bg-black/30 z-40"
+            className="fixed inset-0 bg-black/30 z-40 transition-opacity"
             onClick={() => setShowMealPopup(false)}
           />
         )}
 
-        {/* Meal type popup card */}
-        {showMealPopup && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 w-[280px] bg-card rounded-2xl shadow-xl p-4 animate-in slide-in-from-bottom-4 fade-in duration-200">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-foreground">Add Meal</h3>
+        {/* Bottom sheet — slides up from bottom */}
+        <div
+          className={`fixed left-0 right-0 z-50 transition-transform duration-300 ease-out ${
+            showMealPopup ? "translate-y-0" : "translate-y-full"
+          }`}
+          style={{ bottom: "64px" }}
+        >
+          <div className="bg-card rounded-t-3xl shadow-2xl px-5 pt-4 pb-6">
+            {/* Drag handle */}
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-foreground">Add Meal</h3>
               <button
                 onClick={() => setShowMealPopup(false)}
-                className="h-6 w-6 rounded-full bg-muted flex items-center justify-center"
+                className="h-7 w-7 rounded-full bg-muted flex items-center justify-center"
               >
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
+                <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+
+            <div className="grid grid-cols-4 gap-3">
               {mealTypes.map((mt) => (
                 <button
                   key={mt.type}
                   onClick={() => handleMealSelect(mt.type)}
-                  className={`${mt.bg} rounded-xl p-3 flex flex-col items-center gap-1.5 transition-all active:scale-95 hover:shadow-sm`}
+                  className={`${mt.bg} rounded-2xl p-3 flex flex-col items-center gap-2 transition-all active:scale-95 hover:shadow-sm`}
                 >
                   <span className="text-2xl">{mt.emoji}</span>
-                  <span className={`text-xs font-semibold ${mt.color}`}>{mt.label}</span>
+                  <span className={`text-[11px] font-semibold ${mt.color}`}>{mt.label}</span>
                 </button>
               ))}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Nav bar */}
         <div className="bg-card/95 backdrop-blur border-t border-border/40">
