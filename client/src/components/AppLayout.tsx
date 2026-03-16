@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useDemo } from "@/contexts/DemoContext";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 import {
@@ -24,15 +25,17 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, loading } = useAuth();
+  const { isDemo } = useDemo();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isDemo && !loading && !user) {
       setLocation("/");
     }
-  }, [loading, user, setLocation]);
+  }, [loading, user, isDemo, setLocation]);
 
-  if (loading || !user) {
+  // In demo mode, skip auth loading gate
+  if (!isDemo && (loading || !user)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -50,7 +53,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={`min-h-screen bg-background flex flex-col ${isDemo ? "pt-9" : ""}`}>
       {/* Main content — no top header */}
       <main className="flex-1 pb-24 sm:pb-6">
         <div className="container py-4 sm:py-5">
@@ -114,7 +117,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </nav>
 
       {/* ── Side Navigation - Desktop ── */}
-      <nav className="hidden sm:flex fixed left-0 top-0 bottom-0 w-16 lg:w-48 bg-card/50 flex-col py-6 z-40">
+      <nav className={`hidden sm:flex fixed left-0 bottom-0 w-16 lg:w-48 bg-card/50 flex-col py-6 z-40 ${isDemo ? "top-9" : "top-0"}`}>
         <div className="flex flex-col gap-1 px-2">
           {navItems.map((item) => {
             const isActive = location === item.path;

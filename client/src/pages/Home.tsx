@@ -1,18 +1,51 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, User, Loader2, Play } from "lucide-react";
+import { useDemo } from "@/contexts/DemoContext";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+
+/* ─── Helper: check if there's demo data worth migrating ─── */
+function hasDemoData(): boolean {
+  try {
+    const meals = JSON.parse(localStorage.getItem("nutritrack_demo_meals") || "[]");
+    const library = JSON.parse(localStorage.getItem("nutritrack_demo_library") || "[]");
+    return meals.length > 0 || library.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function getDemoExport() {
+  try {
+    const meals = JSON.parse(localStorage.getItem("nutritrack_demo_meals") || "[]");
+    const libraryItems = JSON.parse(localStorage.getItem("nutritrack_demo_library") || "[]");
+    const settings = JSON.parse(localStorage.getItem("nutritrack_demo_settings") || '{"dailyCalorieTarget":2000,"dailyProteinTarget":150}');
+    const tags = JSON.parse(localStorage.getItem("nutritrack_demo_tags") || "[]");
+    return { meals, libraryItems, settings: { dailyCalorieTarget: settings.dailyCalorieTarget, dailyProteinTarget: settings.dailyProteinTarget }, tags: tags.map((t: any) => ({ name: t.name })) };
+  } catch {
+    return null;
+  }
+}
+
+function clearDemoStorage() {
+  localStorage.removeItem("nutritrack_demo_mode");
+  localStorage.removeItem("nutritrack_demo_meals");
+  localStorage.removeItem("nutritrack_demo_library");
+  localStorage.removeItem("nutritrack_demo_settings");
+  localStorage.removeItem("nutritrack_demo_tags");
+  localStorage.removeItem("nutritrack_demo_next_id");
+}
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const { isDemo, enterDemo, clearDemoData } = useDemo();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -20,11 +53,35 @@ export default function Home() {
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const migrationAttempted = useRef(false);
+
+  const migrateMutation = trpc.migration.importDemoData.useMutation({
+    onSuccess: (data) => {
+      clearDemoData();
+      clearDemoStorage();
+      toast.success(`Demo data imported! ${data.imported.meals} meals, ${data.imported.libraryItems} library items, ${data.imported.tags} tags.`);
+    },
+    onError: () => {
+      // Silently fail migration — user still gets their account
+      clearDemoData();
+      clearDemoStorage();
+    },
+  });
 
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async () => {
       await utils.auth.me.invalidate();
       toast.success("Account created successfully!");
+      // Attempt demo data migration after successful registration
+      if (hasDemoData()) {
+        const data = getDemoExport();
+        if (data) {
+          migrateMutation.mutate(data);
+        }
+      } else {
+        clearDemoData();
+        clearDemoStorage();
+      }
       setLocation("/dashboard");
     },
     onError: (err) => {
@@ -37,6 +94,16 @@ export default function Home() {
     onSuccess: async () => {
       await utils.auth.me.invalidate();
       toast.success("Welcome back!");
+      // Attempt demo data migration after successful login
+      if (hasDemoData()) {
+        const data = getDemoExport();
+        if (data) {
+          migrateMutation.mutate(data);
+        }
+      } else {
+        clearDemoData();
+        clearDemoStorage();
+      }
       setLocation("/dashboard");
     },
     onError: (err) => {
@@ -45,11 +112,22 @@ export default function Home() {
     },
   });
 
+  // Auto-migrate demo data for OAuth users who return authenticated
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (!loading && isAuthenticated && !isDemo && hasDemoData() && !migrationAttempted.current) {
+      migrationAttempted.current = true;
+      const data = getDemoExport();
+      if (data) {
+        migrateMutation.mutate(data);
+      }
+    }
+  }, [loading, isAuthenticated, isDemo]);
+
+  useEffect(() => {
+    if (!loading && (isAuthenticated || isDemo)) {
       setLocation("/dashboard");
     }
-  }, [loading, isAuthenticated, setLocation]);
+  }, [loading, isAuthenticated, isDemo, setLocation]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -247,6 +325,21 @@ export default function Home() {
                 fill="#EA4335"
               />
             </svg>
+          </button>
+        </div>
+
+        {/* Try Demo */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => {
+              enterDemo();
+              setLocation("/dashboard");
+            }}
+            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-dashed border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
+            <Play className="h-4 w-4" />
+            Try demo without signing in
           </button>
         </div>
 

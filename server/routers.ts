@@ -509,6 +509,85 @@ IMPORTANT RULES:
       }),
   }),
 
+  // ─── Demo Data Migration ────────────────────────────────────
+  migration: router({
+    importDemoData: protectedProcedure
+      .input(
+        z.object({
+          meals: z.array(
+            z.object({
+              mealName: z.string(),
+              mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+              calories: z.string(),
+              protein: z.string(),
+              quantity: z.string().nullable(),
+              servingType: z.string().nullable(),
+              photoUrl: z.string().nullable(),
+              tags: z.string().nullable(),
+              loggedAt: z.number(),
+            })
+          ),
+          libraryItems: z.array(
+            z.object({
+              name: z.string(),
+              calories: z.string(),
+              protein: z.string(),
+              defaultQuantity: z.string().nullable(),
+              defaultServingType: z.string().nullable(),
+            })
+          ),
+          settings: z.object({
+            dailyCalorieTarget: z.number(),
+            dailyProteinTarget: z.number(),
+          }),
+          tags: z.array(z.object({ name: z.string() })),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Import meals
+        for (const meal of input.meals) {
+          await createMealLog({
+            userId: ctx.user.id,
+            mealName: meal.mealName,
+            mealType: meal.mealType,
+            calories: meal.calories,
+            protein: meal.protein,
+            quantity: meal.quantity,
+            servingType: meal.servingType,
+            photoUrl: meal.photoUrl,
+            tags: meal.tags,
+            loggedAt: meal.loggedAt,
+          });
+        }
+
+        // Import library items
+        for (const item of input.libraryItems) {
+          await addFoodLibraryItem({
+            userId: ctx.user.id,
+            name: item.name,
+            calories: item.calories,
+            protein: item.protein,
+            defaultQuantity: item.defaultQuantity,
+            defaultServingType: item.defaultServingType,
+          });
+        }
+
+        // Import settings
+        await upsertUserSettings({
+          userId: ctx.user.id,
+          dailyCalorieTarget: input.settings.dailyCalorieTarget,
+          dailyProteinTarget: input.settings.dailyProteinTarget,
+        });
+
+        // Import tags
+        for (const tag of input.tags) {
+          await addUserTag({ userId: ctx.user.id, name: tag.name });
+        }
+
+        return { success: true, imported: { meals: input.meals.length, libraryItems: input.libraryItems.length, tags: input.tags.length } };
+      }),
+  }),
+
   // ─── Google Sheets Sync ─────────────────────────────────────
   sheets: router({
     serviceAccountEmail: protectedProcedure.query(() => {

@@ -86,3 +86,9 @@
 - [x] Add camera/photo upload to Library Add to Library dialog
 - [x] AI food recognition to auto-fill name, calories, protein from photo in Library
 - [x] Store photo URL for library items
+- [x] Create demo mode context with localStorage data adapter
+- [x] Intercept tRPC calls in demo mode to use localStorage instead of backend
+- [x] Add "Try Demo" / "Skip sign in" button on login page
+- [x] Show persistent demo banner in app when in demo mode
+- [x] Migrate localStorage data to database on sign-up
+- [x] Gate features that require real auth (Google Sheets sync) in demo mode

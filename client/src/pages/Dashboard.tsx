@@ -1,4 +1,3 @@
-import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +43,9 @@ import AddMealDialog from "@/components/AddMealDialog";
 import EditMealDialog from "@/components/EditMealDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useDemo } from "@/contexts/DemoContext";
+import { useDemoAwareMeals, useDemoAwareSettings } from "@/hooks/useDemoAware";
+import { trpc } from "@/lib/trpc";
 
 /* ─── Constants ───────────────────────────────────────────── */
 const CAL_COLOR = "oklch(0.72 0.17 55)";
@@ -153,7 +155,8 @@ function WeekDaySelector({
 /* ─── Greeting Header ─────────────────────────────────────── */
 function GreetingHeader({ greeting }: { greeting: string }) {
   const { user } = useAuth();
-  const name = user?.name?.split(" ")[0] ?? "";
+  const { isDemo } = useDemo();
+  const name = isDemo ? "Explorer" : (user?.name?.split(" ")[0] ?? "");
   return (
     <h2 className="text-lg font-bold text-foreground">
       {greeting}{name ? `, ${name}` : ""}
@@ -312,7 +315,7 @@ function MealCard({
         </p>
 
         {/* Macros */}
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-2 mt-1">
           <span className="text-xs font-bold" style={{ color: CAL_COLOR }}>
             {Math.round(Number(meal.calories))} kcal
           </span>
@@ -365,8 +368,41 @@ function QuickAddSuggestions({
   onQuickLog: (suggestion: any) => void;
   onAddNew: () => void;
 }) {
+  const { isDemo, meals: demoMeals } = useDemo();
   const [currentHour] = useState(() => new Date().getHours());
-  const { data: suggestions = [], isLoading } = trpc.meals.suggestions.useQuery({ currentHour });
+  const { data: trpcSuggestions = [], isLoading: trpcLoading } = trpc.meals.suggestions.useQuery(
+    { currentHour },
+    { enabled: !isDemo }
+  );
+
+  // For demo mode, derive suggestions from demo meals
+  const demoSuggestions = useMemo(() => {
+    if (!isDemo) return [];
+    const freq: Record<string, { meal: typeof demoMeals[0]; count: number }> = {};
+    for (const m of demoMeals) {
+      const key = m.mealName.toLowerCase();
+      if (!freq[key]) {
+        freq[key] = { meal: m, count: 0 };
+      }
+      freq[key].count++;
+    }
+    return Object.values(freq)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((f) => ({
+        mealName: f.meal.mealName,
+        mealType: f.meal.mealType,
+        calories: f.meal.calories,
+        protein: f.meal.protein,
+        quantity: f.meal.quantity,
+        servingType: f.meal.servingType,
+        photoUrl: f.meal.photoUrl,
+        frequency: f.count,
+      }));
+  }, [isDemo, demoMeals]);
+
+  const suggestions = isDemo ? demoSuggestions : trpcSuggestions;
+  const isLoading = !isDemo && trpcLoading;
 
   const getMealEmoji = (mealType: string) => {
     const map: Record<string, string> = { breakfast: "☀️", lunch: "🥗", dinner: "🍝", snack: "🍎" };
@@ -396,7 +432,6 @@ function QuickAddSuggestions({
     );
   }
 
-  // If no suggestions yet, show a prompt to log meals
   if (suggestions.length === 0) {
     return (
       <div>
@@ -421,7 +456,7 @@ function QuickAddSuggestions({
         </h3>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {suggestions.map((s, i) => (
+        {suggestions.map((s: any, i: number) => (
           <button
             key={i}
             className={`rounded-2xl px-3 py-3 flex items-start gap-2.5 transition-all hover:shadow-md active:scale-[0.98] text-left ${getPastelBg(s.mealType)}`}
@@ -459,6 +494,7 @@ function QuickAddSuggestions({
 
 /* ─── Main Dashboard ──────────────────────────────────────── */
 export default function Dashboard() {
+  const { isDemo } = useDemo();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [addMealOpen, setAddMealOpen] = useState(false);
   const [addMealType, setAddMealType] = useState<MealType>("breakfast");
@@ -469,20 +505,8 @@ export default function Dashboard() {
   const dayStart = useMemo(() => startOfDay(selectedDate).getTime(), [selectedDate]);
   const dayEnd = useMemo(() => endOfDay(selectedDate).getTime(), [selectedDate]);
 
-  const { data: settings } = trpc.settings.get.useQuery();
-  const { data: meals = [], refetch: refetchMeals } = trpc.meals.listByDate.useQuery({
-    startMs: dayStart,
-    endMs: dayEnd,
-  });
-
-  const deleteMeal = trpc.meals.delete.useMutation({
-    onSuccess: () => { refetchMeals(); toast.success("Meal deleted"); },
-  });
-
-  const quickLogMeal = trpc.meals.create.useMutation({
-    onSuccess: () => { refetchMeals(); toast.success("Meal logged!"); },
-    onError: (err) => { toast.error(err.message); },
-  });
+  const { settings } = useDemoAwareSettings();
+  const { meals, createMeal, removeMeal, refetch: refetchMeals } = useDemoAwareMeals(dayStart, dayEnd);
 
   const syncSheets = trpc.sheets.sync.useMutation({
     onSuccess: (data) => {
@@ -498,14 +522,14 @@ export default function Dashboard() {
 
   const calorieTarget = settings?.dailyCalorieTarget ?? 2000;
   const proteinTarget = settings?.dailyProteinTarget ?? 150;
-  const totalCalories = meals.reduce((sum, m) => sum + Number(m.calories), 0);
-  const totalProtein = meals.reduce((sum, m) => sum + Number(m.protein), 0);
+  const totalCalories = meals.reduce((sum: number, m: any) => sum + Number(m.calories), 0);
+  const totalProtein = meals.reduce((sum: number, m: any) => sum + Number(m.protein), 0);
 
   const calOnTrack = totalCalories <= calorieTarget;
   const protOnTrack = totalProtein >= proteinTarget;
 
   const sortedMeals = useMemo(
-    () => [...meals].sort((a, b) => Number(b.loggedAt) - Number(a.loggedAt)),
+    () => [...meals].sort((a: any, b: any) => Number(b.loggedAt) - Number(a.loggedAt)),
     [meals]
   );
 
@@ -528,6 +552,10 @@ export default function Dashboard() {
   };
 
   const handleSync = () => {
+    if (isDemo) {
+      toast.info("Google Sheets sync is not available in demo mode. Sign up to use this feature.");
+      return;
+    }
     if (!settings?.googleSheetUrl) {
       toast.error("Please configure your Google Sheets URL in Settings first.");
       return;
@@ -538,7 +566,7 @@ export default function Dashboard() {
 
   const confirmDelete = () => {
     if (deleteTarget) {
-      deleteMeal.mutate({ id: deleteTarget.id });
+      removeMeal(deleteTarget.id);
       setDeleteTarget(null);
     }
   };
@@ -573,7 +601,7 @@ export default function Dashboard() {
       {/* ── Quick Add — Smart Suggestions ── */}
       <QuickAddSuggestions
         onQuickLog={(suggestion) => {
-          quickLogMeal.mutate({
+          createMeal({
             mealName: suggestion.mealName,
             mealType: suggestion.mealType as MealType,
             calories: Number(suggestion.calories),
@@ -590,7 +618,8 @@ export default function Dashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-foreground">Intake Log</h3>
-          {settings?.googleSheetUrl && (
+          {(settings?.googleSheetUrl || isDemo) ? null : null}
+          {!isDemo && settings?.googleSheetUrl && (
             <Button variant="ghost" size="sm" onClick={handleSync} disabled={syncing || meals.length === 0} className="text-muted-foreground">
               {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sheet className="h-3.5 w-3.5 mr-1" />}
               Sync
@@ -599,7 +628,7 @@ export default function Dashboard() {
         </div>
 
         {/* Sync result (fallback when API write fails) */}
-        {syncSheets.data && !syncSheets.data.written && (
+        {!isDemo && syncSheets.data && !syncSheets.data.written && (
           <div className="mb-3 rounded-2xl bg-amber-50 p-3">
             <p className="text-xs font-semibold text-amber-800 mb-2">Could not write to sheet directly. Copy this data manually:</p>
             <div className="bg-white rounded-lg p-2 text-xs font-mono space-y-0.5 overflow-x-auto">
@@ -623,7 +652,7 @@ export default function Dashboard() {
         )}
 
         {/* Success message when written to sheet */}
-        {syncSheets.data?.written && (
+        {!isDemo && syncSheets.data?.written && (
           <div className="mb-3 rounded-2xl bg-green-50 p-3 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
             <p className="text-xs font-semibold text-green-800">
@@ -634,7 +663,7 @@ export default function Dashboard() {
 
         {/* Meal cards — minimalist with curved photos */}
         <div className="space-y-2">
-          {sortedMeals.map((meal) => (
+          {sortedMeals.map((meal: any) => (
             <MealCard
               key={meal.id}
               meal={meal}
@@ -680,6 +709,11 @@ export default function Dashboard() {
         mealType={addMealType}
         loggedAt={selectedDate.getTime()}
         onSuccess={() => { refetchMeals(); setAddMealOpen(false); }}
+        isDemo={isDemo}
+        onDemoCreate={(data) => {
+          createMeal(data);
+          setAddMealOpen(false);
+        }}
       />
       {editMeal && (
         <EditMealDialog
@@ -687,6 +721,7 @@ export default function Dashboard() {
           onOpenChange={(v) => { if (!v) setEditMeal(null); }}
           meal={editMeal}
           onSuccess={() => { refetchMeals(); setEditMeal(null); }}
+          isDemo={isDemo}
         />
       )}
     </div>

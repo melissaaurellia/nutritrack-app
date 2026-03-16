@@ -29,6 +29,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Trash2, Pencil, BookOpen, Loader2, UtensilsCrossed, Camera, Upload, PenLine } from "lucide-react";
 import { toast } from "sonner";
+import { useDemo } from "@/contexts/DemoContext";
+import { useDemoAwareLibrary } from "@/hooks/useDemoAware";
 
 const CAL_COLOR = "oklch(0.72 0.17 55)";
 const PROT_COLOR = "oklch(0.55 0.12 260)";
@@ -36,6 +38,9 @@ const PROT_COLOR = "oklch(0.55 0.12 260)";
 const servingTypes = ["pieces", "grams", "plates", "cups", "bowls", "slices", "tablespoons", "servings", "ml"];
 
 export default function Library() {
+  const { isDemo } = useDemo();
+  const { items, addItem, updateItem, removeItem, addPending, updatePending } = useDemoAwareLibrary();
+
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
@@ -60,32 +65,6 @@ export default function Library() {
   const [photoDescription, setPhotoDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  const { data: items = [], refetch } = trpc.library.list.useQuery();
-  const addMutation = trpc.library.add.useMutation({
-    onSuccess: () => {
-      toast.success("Added to library");
-      refetch();
-      resetForm();
-      setAddOpen(false);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-  const updateMutation = trpc.library.update.useMutation({
-    onSuccess: () => {
-      toast.success("Updated");
-      refetch();
-      resetForm();
-      setEditItem(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-  const deleteMutation = trpc.library.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Deleted");
-      refetch();
-    },
-  });
 
   const uploadPhoto = trpc.photo.upload.useMutation();
   const analyzePhoto = trpc.photo.analyze.useMutation();
@@ -132,9 +111,13 @@ export default function Library() {
     };
 
     if (editItem) {
-      updateMutation.mutate({ id: editItem.id, ...data });
+      updateItem(editItem.id, data);
+      setEditItem(null);
+      resetForm();
     } else {
-      addMutation.mutate(data);
+      addItem(data);
+      resetForm();
+      setAddOpen(false);
     }
   };
 
@@ -156,6 +139,10 @@ export default function Library() {
 
   const handleAnalyze = async () => {
     if (!photoBase64) return;
+    if (isDemo) {
+      toast.error("Photo analysis is not available in demo mode. Please sign up to use this feature.");
+      return;
+    }
     setAnalyzing(true);
     try {
       const { url } = await uploadPhoto.mutateAsync({
@@ -167,7 +154,6 @@ export default function Library() {
         userDescription: photoDescription.trim() || undefined,
       });
       setAnalysisResult(result);
-      // Auto-fill the form fields from analysis
       setName(result.name || "");
       setCalories(String(result.calories || 0));
       setProtein(String(result.protein || 0));
@@ -185,18 +171,20 @@ export default function Library() {
       toast.error("Please fill in name and calories");
       return;
     }
-    addMutation.mutate({
+    addItem({
       name: name.trim(),
       calories: parseFloat(calories) || 0,
       protein: parseFloat(protein) || 0,
       defaultQuantity: qty ? parseFloat(qty) : undefined,
       defaultServingType: sType || undefined,
     });
+    resetForm();
+    setAddOpen(false);
   };
 
   const confirmDelete = () => {
     if (deleteTarget) {
-      deleteMutation.mutate({ id: deleteTarget.id });
+      removeItem(deleteTarget.id);
       setDeleteTarget(null);
     }
   };
@@ -236,12 +224,10 @@ export default function Library() {
               key={item.id}
               className="rounded-2xl bg-card p-3 flex items-center gap-3 group transition-all hover:shadow-sm"
             >
-              {/* Icon — curved rectangle matching dashboard */}
               <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
                 <UtensilsCrossed className="h-6 w-6 text-primary/40" />
               </div>
 
-              {/* Content */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -259,7 +245,6 @@ export default function Library() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex flex-col items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="ghost"
@@ -304,7 +289,7 @@ export default function Library() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Dialog (manual only — no photo tab) */}
+      {/* Edit Dialog (manual only) */}
       {editItem && (
         <Dialog
           open={!!editItem}
@@ -377,9 +362,9 @@ export default function Library() {
               <Button
                 onClick={handleSubmit}
                 className="w-full"
-                disabled={updateMutation.isPending}
+                disabled={updatePending}
               >
-                {updateMutation.isPending && (
+                {updatePending && (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 )}
                 Update
@@ -473,9 +458,9 @@ export default function Library() {
               <Button
                 onClick={handleSubmit}
                 className="w-full"
-                disabled={addMutation.isPending}
+                disabled={addPending}
               >
-                {addMutation.isPending && (
+                {addPending && (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 )}
                 Add to Library
@@ -542,7 +527,6 @@ export default function Library() {
                   </div>
                   <p className="text-xs text-muted-foreground">{analysisResult.description}</p>
 
-                  {/* Editable fields pre-filled from AI */}
                   <div className="space-y-3">
                     <div>
                       <Label className="text-xs mb-1">Name</Label>
@@ -598,8 +582,8 @@ export default function Library() {
                     </div>
                   </div>
 
-                  <Button onClick={handlePhotoSubmit} className="w-full" disabled={addMutation.isPending}>
-                    {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  <Button onClick={handlePhotoSubmit} className="w-full" disabled={addPending}>
+                    {addPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Add to Library
                   </Button>
                 </div>

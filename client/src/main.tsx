@@ -10,9 +10,18 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+function isDemoMode() {
+  try {
+    return JSON.parse(localStorage.getItem("nutritrack_demo_mode") || "false");
+  } catch {
+    return false;
+  }
+}
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  if (isDemoMode()) return; // Don't redirect in demo mode
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 

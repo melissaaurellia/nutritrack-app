@@ -20,6 +20,7 @@ import { Loader2, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import TagInput from "@/components/TagInput";
 import { format } from "date-fns";
+import { useDemo } from "@/contexts/DemoContext";
 
 interface EditMealDialogProps {
   open: boolean;
@@ -36,11 +37,12 @@ interface EditMealDialogProps {
     loggedAt: number | string;
   };
   onSuccess: () => void;
+  isDemo?: boolean;
 }
 
 const servingTypes = ["pieces", "grams", "plates", "cups", "bowls", "slices", "tablespoons", "servings", "ml"];
 
-export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: EditMealDialogProps) {
+export default function EditMealDialog({ open, onOpenChange, meal, onSuccess, isDemo = false }: EditMealDialogProps) {
   const [mealName, setMealName] = useState(meal.mealName);
   const [mealType, setMealType] = useState(meal.mealType);
   const [calories, setCalories] = useState(String(Math.round(Number(meal.calories))));
@@ -57,6 +59,8 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
   const initialTime = format(new Date(loggedAtMs), "HH:mm");
   const [logDate, setLogDate] = useState(initialDate);
   const [logTime, setLogTime] = useState(initialTime);
+
+  const { updateMeal: demoUpdateMeal } = useDemo();
 
   const updateMeal = trpc.meals.update.useMutation({
     onSuccess: () => {
@@ -79,6 +83,21 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess }: 
       return;
     }
 
+    if (isDemo) {
+      demoUpdateMeal(meal.id, {
+        mealName: mealName.trim(),
+        mealType: mealType as "breakfast" | "lunch" | "dinner" | "snack",
+        calories: String(Number(calories) || 0),
+        protein: String(Number(protein) || 0),
+        quantity: quantity ? String(Number(quantity)) : null,
+        servingType: servingType || null,
+        tags: tags.length > 0 ? tags.join(",") : null,
+        loggedAt: newLoggedAt,
+      });
+      toast.success("Meal updated");
+      onSuccess();
+      return;
+    }
     updateMeal.mutate({
       id: meal.id,
       mealName: mealName.trim(),

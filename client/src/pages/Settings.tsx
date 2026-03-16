@@ -25,60 +25,24 @@ import {
   Check,
   User,
 } from "lucide-react";
+import { useDemo } from "@/contexts/DemoContext";
+import { useDemoAwareSettings, useDemoAwareTags } from "@/hooks/useDemoAware";
+import { useLocation } from "wouter";
 
 export default function Settings() {
   const { user, logout } = useAuth();
-  const { data: settings, refetch } = trpc.settings.get.useQuery();
-  const { data: saInfo } = trpc.sheets.serviceAccountEmail.useQuery();
-  const { data: userTags = [], refetch: refetchTags } = trpc.tags.list.useQuery();
-  const { data: tagSuggestions = [] } = trpc.tags.suggestions.useQuery();
+  const { isDemo, exitDemo, clearDemoData } = useDemo();
+  const [, setLocation] = useLocation();
+
+  const { settings, updateSettings: saveSettings, isPending: settingsPending } = useDemoAwareSettings();
+  const { tags: userTags, suggestions: tagSuggestions, addTag: addTagFn, updateTag: updateTagFn, deleteTag: deleteTagFn, addPending: addTagPending, updatePending: updateTagPending, deletePending: deleteTagPending } = useDemoAwareTags();
+
+  // Only fetch sheets info when not in demo mode
+  const { data: saInfo } = trpc.sheets.serviceAccountEmail.useQuery(undefined, { enabled: !isDemo });
+
   const utils = trpc.useUtils();
 
-  const updateSettings = trpc.settings.update.useMutation({
-    onSuccess: () => {
-      toast.success("Settings saved");
-      refetch();
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const addTagMutation = trpc.tags.add.useMutation({
-    onSuccess: () => {
-      refetchTags();
-      utils.tags.suggestions.invalidate();
-      setNewTagName("");
-      toast.success("Tag added");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const updateTagMutation = trpc.tags.update.useMutation({
-    onSuccess: () => {
-      refetchTags();
-      utils.tags.suggestions.invalidate();
-      setEditingTagId(null);
-      setEditingTagName("");
-      toast.success("Tag updated");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const deleteTagMutation = trpc.tags.delete.useMutation({
-    onSuccess: () => {
-      refetchTags();
-      utils.tags.suggestions.invalidate();
-      toast.success("Tag deleted");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const [calorieTarget, setCalorieTarget] = useState("2000");
-  const [proteinTarget, setProteinTarget] = useState("150");
-  const [sheetUrl, setSheetUrl] = useState("");
-  const [sheetName, setSheetName] = useState("Sheet1");
-  const [copied, setCopied] = useState(false);
-
-  // Username editing state
+  // Username editing (only for real users)
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.name || "");
 
@@ -99,6 +63,12 @@ export default function Settings() {
     }
     updateNameMutation.mutate({ name: trimmed });
   };
+
+  const [calorieTarget, setCalorieTarget] = useState("2000");
+  const [proteinTarget, setProteinTarget] = useState("150");
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetName, setSheetName] = useState("Sheet1");
+  const [copied, setCopied] = useState(false);
 
   // Tag management state
   const [newTagName, setNewTagName] = useState("");
@@ -121,7 +91,7 @@ export default function Settings() {
   );
 
   const unmanagedTags = useMemo(
-    () => tagSuggestions.filter((t) => !managedTagNames.has(t.toLowerCase())),
+    () => tagSuggestions.filter((t: string) => !managedTagNames.has(t.toLowerCase())),
     [tagSuggestions, managedTagNames]
   );
 
@@ -132,13 +102,17 @@ export default function Settings() {
       toast.error("Please enter valid numbers");
       return;
     }
-    updateSettings.mutate({
+    saveSettings({
       dailyCalorieTarget: cal,
       dailyProteinTarget: prot,
     });
   };
 
   const handleSaveSheets = () => {
+    if (isDemo) {
+      toast.error("Google Sheets sync is not available in demo mode. Sign up to use this feature.");
+      return;
+    }
     let sheetId: string | null = null;
     if (sheetUrl) {
       const match = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -149,7 +123,7 @@ export default function Settings() {
       sheetId = match[1];
     }
 
-    updateSettings.mutate({
+    saveSettings({
       googleSheetUrl: sheetUrl || null,
       googleSheetId: sheetId,
       googleSheetName: sheetName || "Sheet1",
@@ -168,20 +142,31 @@ export default function Settings() {
   const handleAddTag = (name?: string) => {
     const tagName = (name || newTagName).trim();
     if (!tagName) return;
-    addTagMutation.mutate({ name: tagName });
+    addTagFn(tagName);
     if (!name) setNewTagName("");
   };
 
   const handleUpdateTag = () => {
     if (editingTagId === null || !editingTagName.trim()) return;
-    updateTagMutation.mutate({ id: editingTagId, name: editingTagName.trim() });
+    updateTagFn(editingTagId, editingTagName.trim());
+    setEditingTagId(null);
+    setEditingTagName("");
   };
 
   const handleDeleteTag = (id: number) => {
-    deleteTagMutation.mutate({ id });
+    deleteTagFn(id);
   };
 
-  const serviceAccountConfigured = !!saInfo?.email;
+  const handleDemoSignOut = () => {
+    exitDemo();
+    clearDemoData();
+    setLocation("/");
+  };
+
+  const serviceAccountConfigured = !isDemo && !!saInfo?.email;
+
+  const displayName = isDemo ? "Demo User" : (user?.name || "User");
+  const displayEmail = isDemo ? "demo@nutritrack.app" : user?.email;
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
@@ -196,7 +181,7 @@ export default function Settings() {
         <div className="space-y-3">
           <div>
             <Label className="text-xs mb-1">Username</Label>
-            {editingName ? (
+            {!isDemo && editingName ? (
               <div className="flex items-center gap-2">
                 <Input
                   value={newName}
@@ -215,23 +200,36 @@ export default function Settings() {
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{user?.name || "User"}</p>
-                <Button variant="ghost" size="sm" onClick={() => { setNewName(user?.name || ""); setEditingName(true); }}>
-                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                </Button>
+                <p className="text-sm font-medium">{displayName}</p>
+                {!isDemo && (
+                  <Button variant="ghost" size="sm" onClick={() => { setNewName(user?.name || ""); setEditingName(true); }}>
+                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                  </Button>
+                )}
               </div>
             )}
           </div>
-          {user?.email && (
+          {displayEmail && (
             <div>
               <Label className="text-xs mb-1">Email</Label>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
+              <p className="text-sm text-muted-foreground">{displayEmail}</p>
             </div>
           )}
           <Separator />
-          <Button variant="outline" size="sm" onClick={logout}>
-            <LogOut className="h-3.5 w-3.5 mr-1" /> Sign Out
-          </Button>
+          {isDemo ? (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleDemoSignOut}>
+                <LogOut className="h-3.5 w-3.5 mr-1" /> Exit Demo
+              </Button>
+              <Button size="sm" onClick={() => setLocation("/")}>
+                Sign Up to Save Data
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={logout}>
+              <LogOut className="h-3.5 w-3.5 mr-1" /> Sign Out
+            </Button>
+          )}
         </div>
       </div>
 
@@ -264,9 +262,9 @@ export default function Settings() {
         <Button
           size="sm"
           onClick={handleSaveTargets}
-          disabled={updateSettings.isPending}
+          disabled={settingsPending}
         >
-          {updateSettings.isPending ? (
+          {settingsPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
           ) : (
             <Save className="h-3.5 w-3.5 mr-1" />
@@ -302,9 +300,9 @@ export default function Settings() {
           <Button
             size="sm"
             onClick={() => handleAddTag()}
-            disabled={addTagMutation.isPending || !newTagName.trim()}
+            disabled={addTagPending || !newTagName.trim()}
           >
-            {addTagMutation.isPending ? (
+            {addTagPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Plus className="h-3.5 w-3.5" />
@@ -342,7 +340,7 @@ export default function Settings() {
                       variant="ghost" size="icon"
                       className="h-7 w-7 text-green-600 hover:text-green-700"
                       onClick={handleUpdateTag}
-                      disabled={updateTagMutation.isPending}
+                      disabled={updateTagPending}
                     >
                       <Check className="h-3.5 w-3.5" />
                     </Button>
@@ -374,7 +372,7 @@ export default function Settings() {
                       variant="ghost" size="icon"
                       className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
                       onClick={() => handleDeleteTag(tag.id)}
-                      disabled={deleteTagMutation.isPending}
+                      disabled={deleteTagPending}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -385,7 +383,7 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Unmanaged tags from meals — shown so user can see them and optionally add to managed */}
+        {/* Unmanaged tags from meals */}
         {unmanagedTags.length > 0 && (
           <div className="space-y-1">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tags from Meals</p>
@@ -393,7 +391,7 @@ export default function Settings() {
               These tags exist on your meal entries but are not in your managed list. Click + to add them.
             </p>
             <div className="flex flex-wrap gap-1.5 mt-1">
-              {unmanagedTags.map((tag) => (
+              {unmanagedTags.map((tag: string) => (
                 <button
                   key={tag}
                   onClick={() => handleAddTag(tag)}
@@ -414,121 +412,120 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Google Sheets */}
-      <div className="rounded-2xl bg-card p-4 space-y-4">
-        <div className="flex items-center gap-2">
-          <Sheet className="h-4 w-4 text-green-600" />
-          <p className="text-sm font-semibold text-foreground">Google Sheets Sync</p>
-        </div>
+      {/* Google Sheets — only for authenticated users */}
+      {!isDemo && (
+        <div className="rounded-2xl bg-card p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sheet className="h-4 w-4 text-green-600" />
+            <p className="text-sm font-semibold text-foreground">Google Sheets Sync</p>
+          </div>
 
-        {/* Service Account Status */}
-        {serviceAccountConfigured ? (
-          <div className="bg-green-50 rounded-xl p-3">
-            <div className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-green-800">Service Account Connected</p>
-                <p className="text-[11px] text-green-700 mt-0.5">
-                  Share your Google Sheet with this email as <strong>Editor</strong>:
-                </p>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <code className="text-[10px] bg-white rounded px-2 py-1 text-green-900 truncate block">
-                    {saInfo.email}
-                  </code>
-                  <Button
-                    variant="ghost" size="icon"
-                    className="h-6 w-6 shrink-0 text-green-700 hover:text-green-900"
-                    onClick={handleCopyEmail}
-                  >
-                    {copied ? <CheckCircle2 className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  </Button>
+          {serviceAccountConfigured ? (
+            <div className="bg-green-50 rounded-xl p-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-green-800">Service Account Connected</p>
+                  <p className="text-[11px] text-green-700 mt-0.5">
+                    Share your Google Sheet with this email as <strong>Editor</strong>:
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <code className="text-[10px] bg-white rounded px-2 py-1 text-green-900 truncate block">
+                      {saInfo!.email}
+                    </code>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="h-6 w-6 shrink-0 text-green-700 hover:text-green-900"
+                      onClick={handleCopyEmail}
+                    >
+                      {copied ? <CheckCircle2 className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="bg-amber-50 rounded-xl p-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-amber-800">Service Account Not Configured</p>
-                <p className="text-[11px] text-amber-700 mt-0.5">
-                  A Google Cloud service account key is needed to write data to your sheet.
-                  Please contact the app administrator to set up the service account credentials.
-                </p>
+          ) : (
+            <div className="bg-amber-50 rounded-xl p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-800">Service Account Not Configured</p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    A Google Cloud service account key is needed to write data to your sheet.
+                    Please contact the app administrator to set up the service account credentials.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        <Separator />
-
-        {/* Sheet URL */}
-        <div>
-          <Label className="text-xs mb-1">Google Sheets URL</Label>
-          <Input
-            placeholder="https://docs.google.com/spreadsheets/d/..."
-            value={sheetUrl}
-            onChange={(e) => setSheetUrl(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label className="text-xs mb-1">Sheet Tab Name</Label>
-          <Input
-            placeholder="Sheet1"
-            value={sheetName}
-            onChange={(e) => setSheetName(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={handleSaveSheets}
-            disabled={updateSettings.isPending}
-          >
-            {updateSettings.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-            ) : (
-              <Save className="h-3.5 w-3.5 mr-1" />
-            )}
-            Save Sheet Config
-          </Button>
-          {sheetUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(sheetUrl, "_blank")}
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open Sheet
-            </Button>
           )}
-        </div>
 
-        <Separator />
-
-        {/* Setup Instructions */}
-        <div className="bg-muted/50 rounded-xl p-3 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <p className="text-xs font-semibold text-foreground">How Sync Works</p>
-          </div>
-          <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
-            <li>Paste your Google Sheets URL above and save</li>
-            {serviceAccountConfigured && (
-              <li>
-                Share your sheet with <strong className="text-foreground">{saInfo!.email}</strong> as Editor
-              </li>
-            )}
-            <li>On the Dashboard, tap the <strong className="text-foreground">Sync</strong> button to push data</li>
-            <li>The app will auto-fill: Date, Day, Calories, Protein, and Meals columns</li>
-          </ol>
           <Separator />
-          <p className="text-[10px] text-muted-foreground">
-            <strong>Meals format:</strong>{" "}
-            <code className="bg-background px-1 rounded">Bfast: meal - XXX kcal, XXg pro</code>
-          </p>
+
+          <div>
+            <Label className="text-xs mb-1">Google Sheets URL</Label>
+            <Input
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              value={sheetUrl}
+              onChange={(e) => setSheetUrl(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label className="text-xs mb-1">Sheet Tab Name</Label>
+            <Input
+              placeholder="Sheet1"
+              value={sheetName}
+              onChange={(e) => setSheetName(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleSaveSheets}
+              disabled={settingsPending}
+            >
+              {settingsPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              ) : (
+                <Save className="h-3.5 w-3.5 mr-1" />
+              )}
+              Save Sheet Config
+            </Button>
+            {sheetUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(sheetUrl, "_blank")}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open Sheet
+              </Button>
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="bg-muted/50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <p className="text-xs font-semibold text-foreground">How Sync Works</p>
+            </div>
+            <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Paste your Google Sheets URL above and save</li>
+              {serviceAccountConfigured && (
+                <li>
+                  Share your sheet with <strong className="text-foreground">{saInfo!.email}</strong> as Editor
+                </li>
+              )}
+              <li>On the Dashboard, tap the <strong className="text-foreground">Sync</strong> button to push data</li>
+              <li>The app will auto-fill: Date, Day, Calories, Protein, and Meals columns</li>
+            </ol>
+            <Separator />
+            <p className="text-[10px] text-muted-foreground">
+              <strong>Meals format:</strong>{" "}
+              <code className="bg-background px-1 rounded">Bfast: meal - XXX kcal, XXg pro</code>
+            </p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
+import { useDemoAwareMealsByRange, useDemoAwareSettings } from "@/hooks/useDemoAware";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +32,8 @@ export default function Trends() {
   const startMs = useMemo(() => startOfDay(subDays(new Date(), days - 1)).getTime(), [days]);
   const endMs = useMemo(() => endOfDay(new Date()).getTime(), []);
 
-  const { data: meals = [] } = trpc.meals.listByDateRange.useQuery({ startMs, endMs });
-  const { data: settings } = trpc.settings.get.useQuery();
+  const { meals } = useDemoAwareMealsByRange(startMs, endMs);
+  const { settings } = useDemoAwareSettings();
 
   const calorieTarget = settings?.dailyCalorieTarget ?? 2000;
   const proteinTarget = settings?.dailyProteinTarget ?? 150;

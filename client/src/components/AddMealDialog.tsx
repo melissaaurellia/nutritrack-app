@@ -31,6 +31,8 @@ interface AddMealDialogProps {
   mealType: MealType;
   loggedAt: number;
   onSuccess: () => void;
+  isDemo?: boolean;
+  onDemoCreate?: (data: any) => void;
 }
 
 const servingTypes = ["pieces", "grams", "plates", "cups", "bowls", "slices", "tablespoons", "servings", "ml"];
@@ -48,6 +50,8 @@ export default function AddMealDialog({
   mealType: initialMealType,
   loggedAt,
   onSuccess,
+  isDemo = false,
+  onDemoCreate,
 }: AddMealDialogProps) {
   const [tab, setTab] = useState("manual");
 
@@ -139,7 +143,7 @@ export default function AddMealDialog({
       toast.error("Please fill in meal name and calories");
       return;
     }
-    createMeal.mutate({
+    const mealData = {
       mealName: mealName.trim(),
       mealType: selectedMealType,
       calories: parseFloat(calories) || 0,
@@ -149,11 +153,17 @@ export default function AddMealDialog({
       loggedAt: computedLoggedAt,
       addToLibrary,
       tags: tags.length > 0 ? tags : undefined,
-    });
+    };
+    if (isDemo && onDemoCreate) {
+      onDemoCreate(mealData);
+      resetForm();
+      return;
+    }
+    createMeal.mutate(mealData);
   };
 
   const handleLibrarySelect = (item: (typeof libraryItems)[0]) => {
-    createMeal.mutate({
+    const mealData = {
       mealName: item.name,
       mealType: selectedMealType,
       calories: Number(item.calories),
@@ -161,7 +171,13 @@ export default function AddMealDialog({
       quantity: item.defaultQuantity ? Number(item.defaultQuantity) : undefined,
       servingType: item.defaultServingType ?? undefined,
       loggedAt: computedLoggedAt,
-    });
+    };
+    if (isDemo && onDemoCreate) {
+      onDemoCreate(mealData);
+      resetForm();
+      return;
+    }
+    createMeal.mutate(mealData);
   };
 
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,7 +218,7 @@ export default function AddMealDialog({
 
   const handlePhotoSubmit = () => {
     if (!analysisResult) return;
-    createMeal.mutate({
+    const mealData = {
       mealName: analysisResult.name,
       mealType: selectedMealType,
       calories: analysisResult.calories,
@@ -213,7 +229,13 @@ export default function AddMealDialog({
       loggedAt: computedLoggedAt,
       addToLibrary,
       tags: tags.length > 0 ? tags : undefined,
-    });
+    };
+    if (isDemo && onDemoCreate) {
+      onDemoCreate(mealData);
+      resetForm();
+      return;
+    }
+    createMeal.mutate(mealData);
   };
 
   const currentMealLabel = mealTypeOptions.find((m) => m.value === selectedMealType)?.label || "Meal";
