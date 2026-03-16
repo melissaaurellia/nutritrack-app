@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -635,12 +636,16 @@ export default function Dashboard() {
         {/* Meal cards — minimalist with curved photos */}
         <div className="space-y-2">
           {sortedMeals.map((meal) => (
-            <MealCard
+            <SwipeToDelete
               key={meal.id}
-              meal={meal}
-              onEdit={() => setEditMeal(meal)}
-              onDelete={() => setDeleteTarget({ id: meal.id, name: meal.mealName })}
-            />
+              onDelete={() => deleteMeal.mutate({ id: meal.id })}
+            >
+              <MealCard
+                meal={meal}
+                onEdit={() => setEditMeal(meal)}
+                onDelete={() => setDeleteTarget({ id: meal.id, name: meal.mealName })}
+              />
+            </SwipeToDelete>
           ))}
         </div>
 

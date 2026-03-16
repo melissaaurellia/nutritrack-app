@@ -83,3 +83,6 @@
 - [x] Toggle between Sign In and Create Account views
 - [x] Audit repo for committed API keys/secrets and ensure .gitignore excludes them
 - [x] BUG: Edit and delete icons missing on mobile intake log meal cards
+- [x] Create reusable SwipeToDelete component for mobile touch gestures
+- [x] Integrate swipe-to-delete on Dashboard intake log meal cards
+- [x] Integrate swipe-to-delete on Library food item cards
