@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus, Trash2, Pencil, BookOpen, Loader2, UtensilsCrossed } from "lucide-react";
-import { SwipeToDelete } from "@/components/SwipeToDelete";
 import { toast } from "sonner";
 
 const CAL_COLOR = "oklch(0.72 0.17 55)";
@@ -153,57 +152,53 @@ export default function Library() {
       ) : (
         <div className="space-y-2">
           {filteredItems.map((item) => (
-            <SwipeToDelete
+            <div
               key={item.id}
-              onDelete={() => deleteMutation.mutate({ id: item.id })}
+              className="rounded-2xl bg-card p-3 flex items-center gap-3 group transition-all hover:shadow-sm"
             >
-              <div
-                className="rounded-2xl bg-card p-3 flex items-center gap-3 group transition-all hover:shadow-sm"
-              >
-                {/* Icon — curved rectangle matching dashboard */}
-                <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
-                  <UtensilsCrossed className="h-6 w-6 text-primary/40" />
-                </div>
+              {/* Icon — curved rectangle matching dashboard */}
+              <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
+                <UtensilsCrossed className="h-6 w-6 text-primary/40" />
+              </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {item.defaultQuantity && item.defaultServingType
-                      ? `${Number(item.defaultQuantity)} ${item.defaultServingType}`
-                      : "Per serving"}
-                  </p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs font-bold" style={{ color: CAL_COLOR }}>
-                      {Math.round(Number(item.calories))} kcal
-                    </span>
-                    <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
-                      {Math.round(Number(item.protein))}g pro
-                    </span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => openEdit(item)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {item.defaultQuantity && item.defaultServingType
+                    ? `${Number(item.defaultQuantity)} ${item.defaultServingType}`
+                    : "Per serving"}
+                </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs font-bold" style={{ color: CAL_COLOR }}>
+                    {Math.round(Number(item.calories))} kcal
+                  </span>
+                  <span className="text-xs font-bold" style={{ color: PROT_COLOR }}>
+                    {Math.round(Number(item.protein))}g pro
+                  </span>
                 </div>
               </div>
-            </SwipeToDelete>
+
+              {/* Actions */}
+              <div className="flex flex-col items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => openEdit(item)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
       )}
