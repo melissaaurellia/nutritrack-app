@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Trash2, Pencil, BookOpen, Loader2, UtensilsCrossed } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Plus, Trash2, Pencil, BookOpen, Loader2, UtensilsCrossed, Camera, Upload, PenLine } from "lucide-react";
 import { toast } from "sonner";
 
 const CAL_COLOR = "oklch(0.72 0.17 55)";
@@ -40,12 +41,25 @@ export default function Library() {
   const [editItem, setEditItem] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
+  // Tab state for add dialog
+  const [addTab, setAddTab] = useState("manual");
+
   // Form state
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
   const [protein, setProtein] = useState("");
   const [qty, setQty] = useState("");
   const [sType, setSType] = useState("servings");
+
+  // Photo state
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoMime, setPhotoMime] = useState("image/jpeg");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [photoDescription, setPhotoDescription] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const { data: items = [], refetch } = trpc.library.list.useQuery();
   const addMutation = trpc.library.add.useMutation({
@@ -73,6 +87,9 @@ export default function Library() {
     },
   });
 
+  const uploadPhoto = trpc.photo.upload.useMutation();
+  const analyzePhoto = trpc.photo.analyze.useMutation();
+
   const filteredItems = items.filter((i) =>
     i.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -83,6 +100,13 @@ export default function Library() {
     setProtein("");
     setQty("");
     setSType("servings");
+    setPhotoPreview(null);
+    setPhotoBase64(null);
+    setPhotoMime("image/jpeg");
+    setAnalyzing(false);
+    setAnalysisResult(null);
+    setPhotoDescription("");
+    setAddTab("manual");
   };
 
   const openEdit = (item: any) => {
@@ -112,6 +136,62 @@ export default function Library() {
     } else {
       addMutation.mutate(data);
     }
+  };
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setPhotoPreview(dataUrl);
+      const base64 = dataUrl.split(",")[1];
+      setPhotoBase64(base64);
+      setPhotoMime(file.type || "image/jpeg");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }, []);
+
+  const handleAnalyze = async () => {
+    if (!photoBase64) return;
+    setAnalyzing(true);
+    try {
+      const { url } = await uploadPhoto.mutateAsync({
+        base64: photoBase64,
+        mimeType: photoMime,
+      });
+      const result = await analyzePhoto.mutateAsync({
+        imageUrl: url,
+        userDescription: photoDescription.trim() || undefined,
+      });
+      setAnalysisResult(result);
+      // Auto-fill the form fields from analysis
+      setName(result.name || "");
+      setCalories(String(result.calories || 0));
+      setProtein(String(result.protein || 0));
+      setQty("1");
+      setSType("servings");
+    } catch (err: any) {
+      toast.error("Failed to analyze photo: " + (err.message || "Unknown error"));
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handlePhotoSubmit = () => {
+    if (!name.trim() || !calories) {
+      toast.error("Please fill in name and calories");
+      return;
+    }
+    addMutation.mutate({
+      name: name.trim(),
+      calories: parseFloat(calories) || 0,
+      protein: parseFloat(protein) || 0,
+      defaultQuantity: qty ? parseFloat(qty) : undefined,
+      defaultServingType: sType || undefined,
+    });
   };
 
   const confirmDelete = () => {
@@ -180,7 +260,7 @@ export default function Library() {
               </div>
 
               {/* Actions */}
-              <div className="flex flex-col items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex flex-col items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -224,87 +304,308 @@ export default function Library() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Add/Edit Dialog */}
+      {/* Edit Dialog (manual only — no photo tab) */}
+      {editItem && (
+        <Dialog
+          open={!!editItem}
+          onOpenChange={(v) => {
+            if (!v) {
+              setEditItem(null);
+              resetForm();
+            }
+          }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Edit Item</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs mb-1">Name</Label>
+                <Input
+                  placeholder="e.g. Chicken breast"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs mb-1">Calories (kcal)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={calories}
+                    onChange={(e) => setCalories(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs mb-1">Protein (g)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={protein}
+                    onChange={(e) => setProtein(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs mb-1">Default Quantity</Label>
+                  <Input
+                    type="number"
+                    placeholder="1"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs mb-1">Serving Type</Label>
+                  <Select value={sType} onValueChange={setSType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {servingTypes.map((st) => (
+                        <SelectItem key={st} value={st}>
+                          {st}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                onClick={handleSubmit}
+                className="w-full"
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                )}
+                Update
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Add Dialog (with Manual + Photo tabs) */}
       <Dialog
-        open={addOpen || !!editItem}
+        open={addOpen}
         onOpenChange={(v) => {
           if (!v) {
             setAddOpen(false);
-            setEditItem(null);
             resetForm();
           }
         }}
       >
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Item" : "Add to Library"}</DialogTitle>
+            <DialogTitle>Add to Library</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs mb-1">Name</Label>
-              <Input
-                placeholder="e.g. Chicken breast"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+
+          <Tabs value={addTab} onValueChange={setAddTab} className="w-full">
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="manual" className="text-xs gap-1">
+                <PenLine className="h-3.5 w-3.5" /> Manual
+              </TabsTrigger>
+              <TabsTrigger value="photo" className="text-xs gap-1">
+                <Camera className="h-3.5 w-3.5" /> Photo
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Manual Tab */}
+            <TabsContent value="manual" className="space-y-3 mt-3">
               <div>
-                <Label className="text-xs mb-1">Calories (kcal)</Label>
+                <Label className="text-xs mb-1">Name</Label>
                 <Input
-                  type="number"
-                  placeholder="0"
-                  value={calories}
-                  onChange={(e) => setCalories(e.target.value)}
+                  placeholder="e.g. Chicken breast"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </div>
-              <div>
-                <Label className="text-xs mb-1">Protein (g)</Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={protein}
-                  onChange={(e) => setProtein(e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs mb-1">Calories (kcal)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={calories}
+                    onChange={(e) => setCalories(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs mb-1">Protein (g)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={protein}
+                    onChange={(e) => setProtein(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs mb-1">Default Quantity</Label>
-                <Input
-                  type="number"
-                  placeholder="1"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs mb-1">Default Quantity</Label>
+                  <Input
+                    type="number"
+                    placeholder="1"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs mb-1">Serving Type</Label>
+                  <Select value={sType} onValueChange={setSType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {servingTypes.map((st) => (
+                        <SelectItem key={st} value={st}>
+                          {st}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label className="text-xs mb-1">Serving Type</Label>
-                <Select value={sType} onValueChange={setSType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {servingTypes.map((st) => (
-                      <SelectItem key={st} value={st}>
-                        {st}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button
-              onClick={handleSubmit}
-              className="w-full"
-              disabled={addMutation.isPending || updateMutation.isPending}
-            >
-              {(addMutation.isPending || updateMutation.isPending) && (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Button
+                onClick={handleSubmit}
+                className="w-full"
+                disabled={addMutation.isPending}
+              >
+                {addMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                )}
+                Add to Library
+              </Button>
+            </TabsContent>
+
+            {/* Photo Tab */}
+            <TabsContent value="photo" className="space-y-3 mt-3">
+              {!photoPreview ? (
+                <div className="space-y-3">
+                  <div
+                    className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Upload a photo of the food</p>
+                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG up to 10MB</p>
+                  </div>
+                  <Button
+                    variant="outline" className="w-full"
+                    onClick={() => cameraInputRef.current?.click()}
+                  >
+                    <Camera className="h-4 w-4 mr-2" /> Take a Photo
+                  </Button>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                  <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+                </div>
+              ) : !analysisResult ? (
+                <div className="space-y-3">
+                  <div className="rounded-xl overflow-hidden border border-border">
+                    <img src={photoPreview} alt="Food preview" className="w-full h-48 object-cover" />
+                  </div>
+                  <div>
+                    <Label htmlFor="photoDesc" className="text-xs mb-1">
+                      Describe the food <span className="text-muted-foreground">(optional, helps AI accuracy)</span>
+                    </Label>
+                    <Input
+                      id="photoDesc"
+                      placeholder="e.g. Grilled chicken breast with rice"
+                      value={photoDescription}
+                      onChange={(e) => setPhotoDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline" className="flex-1"
+                      onClick={() => { setPhotoPreview(null); setPhotoBase64(null); setPhotoDescription(""); }}
+                    >
+                      Retake
+                    </Button>
+                    <Button className="flex-1" onClick={handleAnalyze} disabled={analyzing}>
+                      {analyzing ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Analyzing...</>
+                      ) : (
+                        "Analyze Food"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-xl overflow-hidden border border-border">
+                    <img src={photoPreview} alt="Food preview" className="w-full h-32 object-cover" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{analysisResult.description}</p>
+
+                  {/* Editable fields pre-filled from AI */}
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs mb-1">Name</Label>
+                      <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="text-sm font-medium"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs mb-1">Calories (kcal)</Label>
+                        <Input
+                          type="number"
+                          value={calories}
+                          onChange={(e) => setCalories(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">Protein (g)</Label>
+                        <Input
+                          type="number"
+                          value={protein}
+                          onChange={(e) => setProtein(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs mb-1">Default Quantity</Label>
+                        <Input
+                          type="number"
+                          placeholder="1"
+                          value={qty}
+                          onChange={(e) => setQty(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">Serving Type</Label>
+                        <Select value={sType} onValueChange={setSType}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {servingTypes.map((st) => (
+                              <SelectItem key={st} value={st}>
+                                {st}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button onClick={handlePhotoSubmit} className="w-full" disabled={addMutation.isPending}>
+                    {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Add to Library
+                  </Button>
+                </div>
               )}
-              {editItem ? "Update" : "Add to Library"}
-            </Button>
-          </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>

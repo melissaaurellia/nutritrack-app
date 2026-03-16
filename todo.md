@@ -83,3 +83,6 @@
 - [x] Toggle between Sign In and Create Account views
 - [x] Audit repo for committed API keys/secrets and ensure .gitignore excludes them
 - [x] BUG: Edit and delete icons missing on mobile intake log meal cards
+- [x] Add camera/photo upload to Library Add to Library dialog
+- [x] AI food recognition to auto-fill name, calories, protein from photo in Library
+- [x] Store photo URL for library items
