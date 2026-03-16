@@ -81,3 +81,5 @@
 - [x] Add "Continue with Google" OAuth option on sign-in page
 - [x] Design sign-in/sign-up page matching reference screenshots (email fields, password with toggle, social login icons)
 - [x] Toggle between Sign In and Create Account views
+- [x] Audit repo for committed API keys/secrets and ensure .gitignore excludes them
+- [x] BUG: Edit and delete icons missing on mobile intake log meal cards
