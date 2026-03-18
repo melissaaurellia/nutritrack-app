@@ -294,6 +294,29 @@ export default function AddMealDialog({
                 onChange={(e) => setMealName(e.target.value)}
               />
             </div>
+
+            {/* Date & Time */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="entryDate" className="text-xs mb-1">Date</Label>
+                <Input
+                  id="entryDate"
+                  type="date"
+                  value={entryDate}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="entryTime" className="text-xs mb-1">Time</Label>
+                <Input
+                  id="entryTime"
+                  type="time"
+                  value={entryTime}
+                  onChange={(e) => setEntryTime(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="calories" className="text-xs mb-1">Calories (kcal)</Label>
@@ -333,28 +356,6 @@ export default function AddMealDialog({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-
-            {/* Date & Time */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="entryDate" className="text-xs mb-1">Date</Label>
-                <Input
-                  id="entryDate"
-                  type="date"
-                  value={entryDate}
-                  onChange={(e) => setEntryDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="entryTime" className="text-xs mb-1">Time</Label>
-                <Input
-                  id="entryTime"
-                  type="time"
-                  value={entryTime}
-                  onChange={(e) => setEntryTime(e.target.value)}
-                />
               </div>
             </div>
 

@@ -95,3 +95,5 @@
 - [x] BUG: Date and Time input boxes overlap on mobile in AddMealDialog
 - [x] Sort library list alphabetically
 - [x] Add filter options to library (by tag, calories, protein)
+- [x] Add Meal: Move date/time above calories/protein, side-by-side with same width
+- [x] Edit Meal: Make date/time textboxes same size as calories/protein
