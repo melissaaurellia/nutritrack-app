@@ -92,3 +92,6 @@
 - [x] Show persistent demo banner in app when in demo mode
 - [x] Migrate localStorage data to database on sign-up
 - [x] Gate features that require real auth (Google Sheets sync) in demo mode
+- [x] BUG: Date and Time input boxes overlap on mobile in AddMealDialog
+- [x] Sort library list alphabetically
+- [x] Add filter options to library (by tag, calories, protein)

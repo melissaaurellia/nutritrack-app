@@ -337,7 +337,7 @@ export default function AddMealDialog({
             </div>
 
             {/* Date & Time */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="entryDate" className="text-xs mb-1">Date</Label>
                 <Input

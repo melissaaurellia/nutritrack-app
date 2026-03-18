@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Trash2, Pencil, BookOpen, Loader2, UtensilsCrossed, Camera, Upload, PenLine } from "lucide-react";
+import { Search, Plus, Trash2, Pencil, BookOpen, Loader2, UtensilsCrossed, Camera, Upload, PenLine, SlidersHorizontal, ArrowUpDown, X } from "lucide-react";
 import { toast } from "sonner";
 import { useDemo } from "@/contexts/DemoContext";
 import { useDemoAwareLibrary } from "@/hooks/useDemoAware";
@@ -45,6 +45,14 @@ export default function Library() {
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+
+  // Sort & Filter state
+  const [sortBy, setSortBy] = useState<"name" | "calories" | "protein">("name");
+  const [showFilters, setShowFilters] = useState(false);
+  const [minCal, setMinCal] = useState("");
+  const [maxCal, setMaxCal] = useState("");
+  const [minPro, setMinPro] = useState("");
+  const [maxPro, setMaxPro] = useState("");
 
   // Tab state for add dialog
   const [addTab, setAddTab] = useState("manual");
@@ -69,9 +77,25 @@ export default function Library() {
   const uploadPhoto = trpc.photo.upload.useMutation();
   const analyzePhoto = trpc.photo.analyze.useMutation();
 
-  const filteredItems = items.filter((i) =>
-    i.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredItems = items
+    .filter((i) => {
+      if (!i.name.toLowerCase().includes(search.toLowerCase())) return false;
+      const cal = Number(i.calories);
+      const pro = Number(i.protein);
+      if (minCal && cal < Number(minCal)) return false;
+      if (maxCal && cal > Number(maxCal)) return false;
+      if (minPro && pro < Number(minPro)) return false;
+      if (maxPro && pro > Number(maxPro)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "calories") return Number(a.calories) - Number(b.calories);
+      return Number(a.protein) - Number(b.protein);
+    });
+
+  const hasActiveFilters = !!(minCal || maxCal || minPro || maxPro);
+  const clearFilters = () => { setMinCal(""); setMaxCal(""); setMinPro(""); setMaxPro(""); };
 
   const resetForm = () => {
     setName("");
@@ -207,6 +231,78 @@ export default function Library() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      {/* Sort & Filter Bar */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Sort:</span>
+        </div>
+        <div className="flex gap-1">
+          {(["name", "calories", "protein"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setSortBy(s)}
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                sortBy === s
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {s === "name" ? "A-Z" : s === "calories" ? "Calories" : "Protein"}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-colors ${
+            showFilters || hasActiveFilters
+              ? "bg-primary text-primary-foreground font-medium"
+              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+          }`}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Filter
+          {hasActiveFilters && (
+            <span className="ml-0.5 bg-primary-foreground/20 rounded-full w-4 h-4 flex items-center justify-center text-[10px]">!</span>
+          )}
+        </button>
+      </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="rounded-xl bg-card p-3 space-y-3 border border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">Filter by range</span>
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                <X className="h-3 w-3" /> Clear
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[10px] text-muted-foreground mb-0.5">Min Calories</Label>
+              <Input type="number" placeholder="0" value={minCal} onChange={(e) => setMinCal(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground mb-0.5">Max Calories</Label>
+              <Input type="number" placeholder="Any" value={maxCal} onChange={(e) => setMaxCal(e.target.value)} className="h-8 text-xs" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[10px] text-muted-foreground mb-0.5">Min Protein (g)</Label>
+              <Input type="number" placeholder="0" value={minPro} onChange={(e) => setMinPro(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground mb-0.5">Max Protein (g)</Label>
+              <Input type="number" placeholder="Any" value={maxPro} onChange={(e) => setMaxPro(e.target.value)} className="h-8 text-xs" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {filteredItems.length === 0 ? (
         <div className="rounded-2xl bg-card py-12 text-center">
