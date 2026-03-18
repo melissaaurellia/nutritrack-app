@@ -141,7 +141,7 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess, is
 
           {/* Date and Time editing */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="edit-date" className="flex items-center gap-1.5">
                 <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                 Date
@@ -149,15 +149,17 @@ export default function EditMealDialog({ open, onOpenChange, meal, onSuccess, is
               <Input
                 id="edit-date"
                 type="date"
+                className="w-full"
                 value={logDate}
                 onChange={(e) => setLogDate(e.target.value)}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="edit-time">Time</Label>
               <Input
                 id="edit-time"
                 type="time"
+                className="w-full"
                 value={logTime}
                 onChange={(e) => setLogTime(e.target.value)}
               />

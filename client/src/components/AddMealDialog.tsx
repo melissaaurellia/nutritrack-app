@@ -297,20 +297,22 @@ export default function AddMealDialog({
 
             {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="entryDate" className="text-xs mb-1">Date</Label>
                 <Input
                   id="entryDate"
                   type="date"
+                  className="w-full"
                   value={entryDate}
                   onChange={(e) => setEntryDate(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="entryTime" className="text-xs mb-1">Time</Label>
                 <Input
                   id="entryTime"
                   type="time"
+                  className="w-full"
                   value={entryTime}
                   onChange={(e) => setEntryTime(e.target.value)}
                 />

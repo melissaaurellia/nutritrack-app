@@ -97,3 +97,4 @@
 - [x] Add filter options to library (by tag, calories, protein)
 - [x] Add Meal: Move date/time above calories/protein, side-by-side with same width
 - [x] Edit Meal: Make date/time textboxes same size as calories/protein
+- [x] BUG: Date/time inputs overflow grid on mobile iOS causing overlap in Add Meal and Edit Meal
