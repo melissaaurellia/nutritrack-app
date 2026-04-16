@@ -60,14 +60,14 @@ export default function AddMealDialog({
 
   // Date/time state for manual entry
   const [entryDate, setEntryDate] = useState(() => format(new Date(loggedAt), "yyyy-MM-dd"));
-  const [entryTime, setEntryTime] = useState(() => format(new Date(loggedAt), "HH:mm"));
+  const [entryTime, setEntryTime] = useState(() => format(new Date(), "HH:mm"));
 
-  // Sync when dialog opens with new props
+  // Sync when dialog opens with new props — always use current time
   useEffect(() => {
     if (open) {
       setSelectedMealType(initialMealType);
       setEntryDate(format(new Date(loggedAt), "yyyy-MM-dd"));
-      setEntryTime(format(new Date(loggedAt), "HH:mm"));
+      setEntryTime(format(new Date(), "HH:mm"));
     }
   }, [open, initialMealType, loggedAt]);
 
@@ -103,6 +103,15 @@ export default function AddMealDialog({
   // Library search
   const [librarySearch, setLibrarySearch] = useState("");
   const { data: libraryItems = [] } = trpc.library.list.useQuery();
+
+  // Autocomplete state for meal name
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const mealNameSuggestions = mealName.trim().length >= 1
+    ? libraryItems.filter((item) =>
+        item.name.toLowerCase().includes(mealName.trim().toLowerCase())
+      ).slice(0, 6)
+    : [];
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const filteredLibrary = libraryItems.filter((item) =>
     item.name.toLowerCase().includes(librarySearch.toLowerCase())
@@ -285,14 +294,51 @@ export default function AddMealDialog({
 
           {/* Manual Input Tab */}
           <TabsContent value="manual" className="space-y-3 mt-3">
-            <div>
+            <div className="relative">
               <Label htmlFor="mealName" className="text-xs mb-1">Meal Name</Label>
               <Input
                 id="mealName"
                 placeholder="e.g. Chicken breast"
                 value={mealName}
-                onChange={(e) => setMealName(e.target.value)}
+                autoComplete="off"
+                onChange={(e) => {
+                  setMealName(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => {
+                  // Delay to allow click on suggestion
+                  setTimeout(() => setShowSuggestions(false), 200);
+                }}
               />
+              {showSuggestions && mealNameSuggestions.length > 0 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                >
+                  {mealNameSuggestions.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setMealName(item.name);
+                        setCalories(String(Math.round(Number(item.calories))));
+                        setProtein(String(Math.round(Number(item.protein))));
+                        if (item.defaultQuantity) setQuantity(String(item.defaultQuantity));
+                        if (item.defaultServingType) setServingType(item.defaultServingType);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <span className="text-sm truncate">{item.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {Math.round(Number(item.calories))} kcal · {Math.round(Number(item.protein))}g pro
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Date & Time */}

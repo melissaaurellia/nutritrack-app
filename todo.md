@@ -98,3 +98,5 @@
 - [x] Add Meal: Move date/time above calories/protein, side-by-side with same width
 - [x] Edit Meal: Make date/time textboxes same size as calories/protein
 - [x] BUG: Date/time inputs overflow grid on mobile iOS causing overlap in Add Meal and Edit Meal
+- [x] Fix Add Meal time to always default to current time regardless of selected date
+- [x] Add meal name autocomplete suggestions from food library in Add Meal dialog
